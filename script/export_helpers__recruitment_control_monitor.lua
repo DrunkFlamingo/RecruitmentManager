@@ -19,9 +19,7 @@ local prefix_to_subculture = {
     dwf = "wh_main_sc_dwf_dwarfs",
     emp = "wh_main_sc_emp_empire",
     grn = "wh_main_sc_grn_greenskins",
-    ksl = "wh_main_sc_ksl_kislev",
     nor = "wh_main_sc_nor_norsca",
-    teb = "wh_main_sc_teb_teb",
     vmp = "wh_main_sc_vmp_vampire_counts",
     tmb = "wh2_dlc09_sc_tmb_tomb_kings",
     def = "wh2_main_sc_def_dark_elves",
@@ -35,6 +33,11 @@ local subculture_to_prefix = {} --:map<string, string>
 for k, v in pairs(prefix_to_subculture) do
     subculture_to_prefix[v] = k
 end
+--overrides for some subcultures. 
+subculture_to_prefix["wh_main_sc_teb_teb"] = "emp"
+subculture_to_prefix["wh_main_sc_ksl_kislev"] = "emp"
+subculture_to_prefix["wh_main_sc_grn_savage_orcs"] = "grn"
+
 local prefix_to_subculture = nil
 --helpers
 --do small stuff for the UI
