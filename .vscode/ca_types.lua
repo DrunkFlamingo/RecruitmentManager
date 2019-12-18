@@ -143,6 +143,7 @@
 --# assume CM.fade_scene: method(unknown: number, unknown2: number)
 --callbacks
 --# assume CM.first_tick_callbacks: vector<(function(context: WHATEVER?))>
+--# assume CM.add_first_tick_callback: method(context: WHATEVER?)
 --# assume CM.add_game_created_callback: method(callback: function)
 --# assume CM.callback: method(
 --#     callback: function(),
