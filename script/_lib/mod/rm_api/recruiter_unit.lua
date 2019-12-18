@@ -1,5 +1,8 @@
  recruiter_unit = {} --# assume recruiter_unit: RECRUITER_UNIT
 
+ local override_group_additions = {} --:map<string, map<string, boolean>>
+ -- map group name to unit name to added.
+
 --v function( manager: RECRUITER_MANAGER, main_unit_key: string, base_unit: RECRUITER_UNIT?) --> RECRUITER_UNIT
 function recruiter_unit.create_record(manager, main_unit_key, base_unit)
     local self = {}
@@ -59,8 +62,26 @@ end
 --v function(self: RECRUITER_UNIT, groupID: string)
 function recruiter_unit.add_group_to_unit(self, groupID)
     self._groups[groupID] = true
-    self._manager._groupToUnits[groupID] = self._manager._groupToUnits[groupID] or {}
-    table.insert(self._manager._groupToUnits[groupID], self._key)
+    if not self._isOverride then
+        --normal unit.
+        self._manager._groupToUnits[groupID] = self._manager._groupToUnits[groupID] or {}
+        table.insert(self._manager._groupToUnits[groupID], self._key)
+    elseif self._baseUnit then
+        local base = self._baseUnit --# assume base: RECRUITER_UNIT!
+        --we only need to add this unit to this group if it isn't already present.
+        --if it has the same group as it's base unit, it's already present in the check vector.
+        if not base._groups[groupID] then 
+            --otherwise, we keep a record of where we put unit keys for override units.
+            override_group_additions[groupID] = override_group_additions[groupID] or {}
+            if not override_group_additions[groupID][self._key] then
+                self._manager._groupToUnits[groupID] = self._manager._groupToUnits[groupID] or {}
+                table.insert(self._manager._groupToUnits[groupID], self._key)
+                override_group_additions[groupID][self._key] = true
+            end
+        end
+    else
+        self:log("Something went wrong adding group to a unit object: Unit was not added to check vector!")
+    end
 end
 
 --v function(self: RECRUITER_UNIT, groupID: string) --> boolean

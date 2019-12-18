@@ -663,8 +663,8 @@ function recruiter_manager.check_individual_unit_on_character(self, unitID,rec_c
             process_record[groupID] = true
         end
     end
-
-    for groupID, _ in pairs(unit:groups()) do    
+    local did_restrict = false --:boolean
+    for groupID, _ in pairs(process_record) do    
         local grouped_units = self:get_units_in_group(groupID)
         local restriction_quantity = rec_char:get_quantity_limit_for_group(groupID)
         for i = 1, #grouped_units do
@@ -672,10 +672,18 @@ function recruiter_manager.check_individual_unit_on_character(self, unitID,rec_c
             --wait! We need to make sure this unit is actually in this group for this specific character!
             --otherwise we'll fuck up the other groups' restrictions!
             if grouped_unit:has_group(groupID) then
-                rec_char:set_unit_restriction(grouped_unit:key(),
-                    rec_char:get_group_counts_on_character(groupID) + grouped_unit:weight() > restriction_quantity,
-                    "This character already has the maximum number of "..self:get_ui_name_for_group(groupID)..". ("..restriction_quantity..")"
-                )
+                local should_restrict = rec_char:get_group_counts_on_character(groupID) + grouped_unit:weight() > restriction_quantity
+                if should_restrict then
+                    did_restrict = true
+                end
+                if should_restrict or (not did_restrict) then
+                    --if we should restrict, add a reason. 
+                    --If we have already restricted, and this is false, then we don't want to cancel that valid restriction.
+                    rec_char:set_unit_restriction(grouped_unit:key(),
+                        should_restrict,
+                        "This character already has the maximum number of "..self:get_ui_name_for_group(groupID)..". ("..restriction_quantity..")"
+                    )
+                end
             end
         end
     end
@@ -714,16 +722,27 @@ function recruiter_manager.check_all_ui_recruitment_options(self, rec_char, ui_o
             end
         end
     end
+    local did_restrict = false --:boolean
     for groupID, _ in pairs(process_record) do    
         local grouped_units = self:get_units_in_group(groupID)
         local restriction_quantity = rec_char:get_quantity_limit_for_group(groupID)
         for i = 1, #grouped_units do
             local grouped_unit = self:get_unit(grouped_units[i], rec_char)
+            --wait! We need to make sure this unit is actually in this group for this specific character!
+            --otherwise we'll fuck up the other groups' restrictions!
             if grouped_unit:has_group(groupID) then
-                rec_char:set_unit_restriction(grouped_unit:key(),
-                    rec_char:get_group_counts_on_character(groupID) + grouped_unit:weight() > restriction_quantity,
-                    "This character already has the maximum number of "..self:get_ui_name_for_group(groupID)..". ("..restriction_quantity..")"
-                )
+                local should_restrict = rec_char:get_group_counts_on_character(groupID) + grouped_unit:weight() > restriction_quantity
+                if should_restrict then
+                    did_restrict = true
+                end
+                if should_restrict or (not did_restrict) then
+                    --if we should restrict, add a reason. 
+                    --If we have already restricted, and this is false, then we don't want to cancel that valid restriction.
+                    rec_char:set_unit_restriction(grouped_unit:key(),
+                        should_restrict,
+                        "This character already has the maximum number of "..self:get_ui_name_for_group(groupID)..". ("..restriction_quantity..")"
+                    )
+                end
             end
         end
     end
@@ -767,6 +786,7 @@ function recruiter_manager.remove_unit_from_character_queue_and_refresh_limits(s
     --reduce the count of the queue for that unit!
     local ok = is_mercenary or rec_char:remove_unit_from_queue(unitID)
     if ok then
+        local did_restrict = false --:boolean
         for groupID, _ in pairs(rec_unit:groups()) do
             local current_count = rec_char:get_group_counts_on_character(groupID)
             local new_count = current_count+rec_unit:weight()
@@ -781,10 +801,16 @@ function recruiter_manager.remove_unit_from_character_queue_and_refresh_limits(s
             for i = 1, #grouped_units do
                 local grouped_unit = self:get_unit(grouped_units[i], rec_char)
                 if grouped_unit:has_group(groupID) then
-                    rec_char:set_unit_restriction(grouped_unit:key(),
-                        rec_char:get_group_counts_on_character(groupID) + grouped_unit:weight() > restriction_quantity,
-                        "This character already has the maximum number of "..self:get_ui_name_for_group(groupID)..". ("..restriction_quantity..")"
-                    )
+                    local should_restrict = rec_char:get_group_counts_on_character(groupID) + grouped_unit:weight() > restriction_quantity
+                    if should_restrict then
+                        did_restrict = true
+                    end
+                    if should_restrict or (not did_restrict) then
+                        rec_char:set_unit_restriction(grouped_unit:key(),
+                            should_restrict,
+                            "This character already has the maximum number of "..self:get_ui_name_for_group(groupID)..". ("..restriction_quantity..")"
+                        )
+                    end
                 end
             end
         end
@@ -808,10 +834,16 @@ function recruiter_manager.add_unit_to_character_queue_and_refresh_limits(self, 
         for i = 1, #grouped_units do
             local grouped_unit = self:get_unit(grouped_units[i], rec_char)
             if grouped_unit:has_group(groupID) then
-                rec_char:set_unit_restriction(grouped_unit:key(),
-                    rec_char:get_group_counts_on_character(groupID) + grouped_unit:weight() > restriction_quantity,
-                    "This character already has the maximum number of "..self:get_ui_name_for_group(groupID)..". ("..restriction_quantity..")"
-                )
+                local should_restrict = rec_char:get_group_counts_on_character(groupID) + grouped_unit:weight() > restriction_quantity
+                if should_restrict then
+                    did_restrict = true
+                end
+                if should_restrict or (not did_restrict) then
+                    rec_char:set_unit_restriction(grouped_unit:key(),
+                        should_restrict,
+                        "This character already has the maximum number of "..self:get_ui_name_for_group(groupID)..". ("..restriction_quantity..")"
+                    )
+                end
             end
         end
     end

@@ -90,12 +90,12 @@ core:add_listener(
             local groupID = subculture_prefix.."_"..suffix
             local uicParent = find_uicomponent(core:get_ui_root(),"units_panel", "main_units_panel", "icon_list")
             if uicParent then
-                local uic = find_uicomponent(uicParent, "dy_"..groupID)
+                local uic = find_uicomponent(uicParent, "rm_display_"..groupID)
                 if not uic then
                     local uicSibling = find_uicomponent(uicParent, "dy_upkeep")
                     if uicSibling then
-                        local new_uic = UIComponent(uicSibling:CopyComponent("dy_"..groupID))
-                        created_uic[#created_uic+1] = "dy_"..groupID
+                        local new_uic = UIComponent(uicSibling:CopyComponent("rm_display_"..groupID))
+                        created_uic[#created_uic+1] = "rm_display_"..groupID
                         --[[local header_bar = find_uicomponent(core:get_ui_root(),"units_panel", "main_units_panel", "header")
                         if header_bar then
                             local current_x, current_y = header_bar:Position()
@@ -137,3 +137,16 @@ core:add_listener(
         end, 0.1)
     end,
     true)
+
+core:add_listener(
+    "RefreshCharacterHack",
+    "ComponentLClickUp",
+    function(context)
+        return not not string.find(context.string, "rm_display_")
+    end,
+    function(context)
+        rm:check_all_units_on_character(rm:current_character())
+        rm:enforce_all_units_on_current_character()
+    end,
+    true
+)

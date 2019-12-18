@@ -160,7 +160,21 @@ end,
 true);
 
 
-
+--add character battle completed listener
+core:add_listener(
+"RecruiterManagerPlayerCharacterBattled",
+"CharacterCompletedBattle",
+function(context)
+    return context:character():faction():is_human() and rm:has_character(context:character():command_queue_index()) 
+end,
+function(context)
+    rm:log("Player Character Completed Battle!")
+    local character = context:character()
+    --# assume character: CA_CHAR
+    rm:get_character_by_cqi(character:command_queue_index()):set_army_stale()
+    rm:get_character_by_cqi(character:command_queue_index()):set_queue_stale()
+end,
+true)
 
 
 
