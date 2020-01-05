@@ -58,15 +58,15 @@ local function limit_character(character, groupID, difference)
         -- find all units in force belonging to group
         local unit_list = force:unit_list()
         local units_to_remove = {}
-    for j = 0, unit_list:num_items() - 1 do
+        for j = 0, unit_list:num_items() - 1 do
             local unit = unit_list:item_at(j)
             local groups_list = rm:get_unit(unit:unit_key()):groups()
             for group_key, _ in pairs(groups_list) do
                 if group_key == groupID then
                     table.insert(units_to_remove,unit)
                     break
-                    end
                 end
+            end
         end
         -- pick one at random
         local unit_to_remove = units_to_remove[cm:random_number(#units_to_remove)]
@@ -85,7 +85,7 @@ local function limit_character(character, groupID, difference)
         rm:log("removed unit ["..unit_to_remove_key.."] for ["..pt_value.."] points!")
 
         -- pick a random default unit
-                local default_units = rm:ai_subculture_defaults()[character:faction():subculture()]
+        local default_units = rm:ai_subculture_defaults()[character:faction():subculture()]
         local unit_to_add_idx = cm:random_number(#default_units)
         local unit_to_add = default_units[unit_to_add_idx]
         local tries = 1
@@ -114,16 +114,75 @@ local function limit_character(character, groupID, difference)
         elseif diff < 0 then
             rm:log("removed unit was too much?! ERROR! diff of ["..diff.."]")
         else
-                    rm:log("removed unit was sufficient!")
+            rm:log("removed unit was sufficient!")
+        end
+    end
+end
+    
+--v function(character: CA_CHAR, recruited_unit: CA_UNIT)
+local function rm_ai_recruitment(character, recruited_unit)
+    local rec_char = rm:get_character_by_cqi(character:command_queue_index())
+    local unit_to_remove_key = recruited_unit:unit_key()
+    if cm:char_is_mobile_general_with_army(character) then
+        -- get current group totals
+        local unit_list = character:military_force():unit_list()
+        local unit_totals = {} --:map<string, number>
+        local group_totals = {} --:map<string, number>
+        for j = 0, unit_list:num_items() - 1 do
+            local unit = unit_list:item_at(j):unit_key()
+            local groups_list = rm:get_unit(unit, rec_char):groups()
+            for groupID, _ in pairs(groups_list) do
+                increment_group_total(group_totals, groupID, rm:get_weight_for_unit(unit, rec_char))
+            end
+        end
+        -- check each group the new unit belongs to to ensure it's in-limit
+        for groupID, quantity in pairs(group_totals) do
+            if rm:get_unit(unit_to_remove_key, rec_char):has_group(groupID) then
+                local limit = rec_char:get_quantity_limit_for_group(groupID)
+                -- if not, replace it with a default core unit
+                if quantity > limit then
+                    rm:log("["..groupID.."] if over limit by ["..quantity.."/"..limit.."] points!")
+                    local cqi = character:command_queue_index()
+                    local force = character:military_force()
+                    local force_cqi = force:command_queue_index()
+
+                    -- get the force's value pre-removal
+                    local prior_value = cm:force_gold_value(force_cqi)
+                    -- remove it
+                    cm:remove_unit_from_character(cm:char_lookup_str(cqi), unit_to_remove_key)
+                    rm:log("removed recruited unit ["..unit_to_remove_key.."] costing ["..rm:get_weight_for_unit(unit_to_remove_key, rm:get_character_by_cqi(cqi)).."] points!")
+
+                    -- pick a random default unit
+                    local default_units = rm:ai_subculture_defaults()[character:faction():subculture()]
+                    local unit_to_add_idx = cm:random_number(#default_units)
+                    local unit_to_add = default_units[unit_to_add_idx]
+                    local tries = 1
+                    while not force:can_recruit_unit(unit_to_add) and tries < #default_units do
+                        -- retry
+                        unit_to_add_idx = (unit_to_add_idx % #default_units) + 1
+                        unit_to_add = default_units[unit_to_add_idx]
+                        tries = tries + 1
+                    end
+
+                    -- stop here if there's no default unit recruitable selected
+                    if unit_to_add == nil then
+                        rm:log("couldn't recruit any randomly selected core unit!")
+                    else
+                        -- add the selected default unit
+                        cm:grant_unit_to_character(cm:char_lookup_str(cqi), unit_to_add)
+                        rm:log("granted ["..unit_to_add.."] as a replacement core unit")
+                    end
+                    -- refund reasury the lost gold value of the force
+                    local refund = prior_value - cm:force_gold_value(force_cqi)
+                    cm:treasury_mod(character:faction():name(), refund)
+                    rm:log("refunded "..refund.."g for lost value")
+
+                    break
                 end
             end
         end
     end
 end
-
-
-
-
 
 --v function(character: CA_CHAR)
 local function rm_ai_character(character)
@@ -147,7 +206,6 @@ local function rm_ai_character(character)
         end
     end
 end
-
 
 --v function(faction:CA_FACTION)
 local function rm_ai_evaluation(faction)
@@ -186,12 +244,7 @@ local function rm_ai_evaluation(faction)
     end, 0.1)
 end
 
-
-
-
-
-
-
+--[[ Use recruitment listener instead to avoid interfering with non-recruited units like lizardman rites or starting LL armies
 core:add_listener(
     "RecruitmentControlsAI",
     "FactionTurnStart",
@@ -202,21 +255,49 @@ core:add_listener(
         rm_ai_evaluation(context:faction())
     end,
     true
-)
+) --]]
 
+--v function(context:CA_UNIT_CONTEXT) --> boolean
+local function should_handle_new_ai_unit(context)
+    return (not context:unit():faction():is_human()) and
+    (rm:should_enforce_ai_restrictions()) and
+    (context:unit():faction():name() ~= "rebels") and
+    (rm:ai_subculture_defaults()[context:unit():faction():subculture()] ~= nil)
+end
 
---[[ --TODO unit pools
+--v function(context:CA_UNIT_CONTEXT)
+local function handle_new_ai_unit(context)
+        rm:log("AI faction ["..context:unit():faction():name().."] has recruited a unit ["..context:unit():unit_key().."]")
+    if context:unit():has_force_commander() then
+        rm_ai_recruitment(context:unit():force_commander(), context:unit())
+    else
+        rm:log("unit recruited without force commander?!")
+    end
+
+    --[[ --TODO unit pools
+    local unit = context:unit() --:CA_UNIT
+    if rm:unit_has_pool(unit:unit_key()) then
+        rm:change_unit_pool(unit:unit_key(), unit:faction():name(), -1)
+    end
+    -- ]]
+end
+
 core:add_listener(
     "RecruitmentControlsAIUnitTrained",
     "UnitTrained",
+    should_handle_new_ai_unit,
+    handle_new_ai_unit,
+    true
+)
+
+--[[ TODO Investigate any uses of the UnitCreated event - seems to fire before recruitment, but also for garrison expansion
+core:add_listener(
+    "RecruitmentControlsAIUnitTrained",
+    "UnitCreated",
+    should_handle_new_ai_unit,
     function(context)
-        return (not context:unit():faction():is_human())
-    end,
-    function(context)
-        local unit = context:unit() --:CA_UNIT
-        if rm:unit_has_pool(unit:unit_key()) then
-            rm:change_unit_pool(unit:unit_key(), unit:faction():name(), -1)
-        end
+        rm:log("AI faction ["..context:unit():faction():name().."] has >>CREATED<< a unit ["..context:unit():unit_key().."]!")
     end,
     true
-)--]]
+)
+--]]
