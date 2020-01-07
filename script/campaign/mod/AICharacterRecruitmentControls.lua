@@ -49,72 +49,32 @@ local function limit_character(character, groupID, difference)
     end
     local diff = difference
     local cqi = character:command_queue_index()
-    local force = character:military_force()
-    local force_cqi = force:command_queue_index()
 
     rm:log("limiting character ["..tostring(cqi).."] in group ["..groupID.."] who has a difference of ["..diff.."] ")
-
-    while diff > 0 do
-        -- find all units in force belonging to group
-        local unit_list = force:unit_list()
-        local units_to_remove = {}
-        for j = 0, unit_list:num_items() - 1 do
-            local unit = unit_list:item_at(j)
-            local groups_list = rm:get_unit(unit:unit_key()):groups()
-            for group_key, _ in pairs(groups_list) do
-                if group_key == groupID then
-                    table.insert(units_to_remove,unit)
-                    break
+    local unit_list = character:military_force():unit_list()
+    for j = 0, unit_list:num_items() - 1 do
+        local unit = unit_list:item_at(j):unit_key()
+        local groups_list = rm:get_unit(unit):groups()
+        for c_groupID, _ in pairs(groups_list) do
+            if c_groupID == groupID then
+                for l = 0, character:military_force():unit_list():num_items() - 1 do
+                    local unit_obj = character:military_force():unit_list():item_at(l)
+                    if unit_obj:unit_key() == unit then
+                        cm:treasury_mod(unit_obj:faction():name(), unit_obj:get_unit_custom_battle_cost())
+                    end
                 end
+                cm:remove_unit_from_character(cm:char_lookup_str(cqi), unit)
+                local default_units = rm:ai_subculture_defaults()[character:faction():subculture()]
+                local new_unit = default_units[cm:random_number(#default_units)]
+                cm:grant_unit_to_character(cm:char_lookup_str(cqi), new_unit)
+                rm:log("removed unit ["..unit.."] and granted ["..new_unit.."] as a replacement unit!")
+                if rm:get_weight_for_unit(unit, rm:get_character_by_cqi(cqi)) >= diff then
+                    rm:log("removed unit was sufficient!")
+                    return
+                end
+                diff = diff - rm:get_weight_for_unit(unit, rm:get_character_by_cqi(cqi));
+                rm:log("removed unit was insufficient, repeating!")
             end
-        end
-        -- pick one at random
-        local unit_to_remove = units_to_remove[cm:random_number(#units_to_remove)]
-        local unit_to_remove_key = unit_to_remove:unit_key()
-        local pt_value = rm:get_weight_for_unit(unit_to_remove_key, rm:get_character_by_cqi(cqi))
-        while pt_value > diff do
-            unit_to_remove = units_to_remove[cm:random_number(#units_to_remove)]
-            unit_to_remove_key = unit_to_remove:unit_key()
-            pt_value = rm:get_weight_for_unit(unit_to_remove_key, rm:get_character_by_cqi(cqi))
-        end
-        -- get the force's value pre-removal
-        local prior_value = cm:force_gold_value(force_cqi)
-        -- remove it
-        cm:remove_unit_from_character(cm:char_lookup_str(cqi), unit_to_remove_key)
-        diff = diff - pt_value
-        rm:log("removed unit ["..unit_to_remove_key.."] for ["..pt_value.."] points!")
-
-        -- pick a random default unit
-        local default_units = rm:ai_subculture_defaults()[character:faction():subculture()]
-        local unit_to_add_idx = cm:random_number(#default_units)
-        local unit_to_add = default_units[unit_to_add_idx]
-        local tries = 1
-        while not force:can_recruit_unit(unit_to_add) and tries < #default_units do
-            -- retry
-            unit_to_add_idx = (unit_to_add_idx % #default_units) + 1
-            unit_to_add = default_units[unit_to_add_idx]
-            tries = tries + 1
-        end
-
-        -- stop here if there's no default unit recruitable selected
-        if unit_to_add == nil then
-            rm:log("couldn't recruit any randomly selected core unit!")
-        else
-            -- add the selected default unit
-            cm:grant_unit_to_character(cm:char_lookup_str(cqi), unit_to_add)
-            rm:log("granted ["..unit_to_add.."] as a replacement unit")
-        end
-        -- refund reasury the lost gold value of the force
-        local refund = prior_value - cm:force_gold_value(force_cqi)
-        cm:treasury_mod(character:faction():name(), refund)
-        rm:log("refunded "..refund.." for lost value")
-
-        if diff > 0 then
-            rm:log("removed unit was insufficient, repeating with diff of ["..diff.."]!")
-        elseif diff < 0 then
-            rm:log("removed unit was too much?! ERROR! diff of ["..diff.."]")
-        else
-            rm:log("removed unit was sufficient!")
         end
     end
 end
