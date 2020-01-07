@@ -141,7 +141,7 @@ local function rm_ai_recruitment(character, recruited_unit)
                 local limit = rec_char:get_quantity_limit_for_group(groupID)
                 -- if not, replace it with a default core unit
                 if quantity > limit then
-                    rm:log("["..groupID.."] if over limit by ["..quantity.."/"..limit.."] points!")
+                    rm:log("["..groupID.."] is over limit by ["..quantity.."/"..limit.."] points!")
                     local cqi = character:command_queue_index()
                     local force = character:military_force()
                     local force_cqi = force:command_queue_index()
@@ -171,11 +171,34 @@ local function rm_ai_recruitment(character, recruited_unit)
                         -- add the selected default unit
                         cm:grant_unit_to_character(cm:char_lookup_str(cqi), unit_to_add)
                         rm:log("granted ["..unit_to_add.."] as a replacement core unit")
+                        core:add_listener(
+                            "rm_granted_unit_to_ai_force",
+                            "UnitCreated",
+                            function(context)
+                                return context:unit():unit_key() == unit_to_add
+                            end,
+                            function(context)
+                                local unit_cost = context:unit():get_unit_custom_battle_cost()
+                                cm:treasury_mod(character:faction():name(), unit_cost)
+                                rm:log("charged ["..context:unit():get_unit_custom_battle_cost().."]g for replacement unit ["..context:unit():unit_key().."]")
+                            end,
+                            false)
+                        core:add_listener(
+                            "rm_granted_unit_to_ai_force_gc",
+                            "FactionTurnEnd",
+                            function(context)
+                                return context:faction():name() == character:faction():name()
+                            end,
+                            function(context)
+                                rm:log("ending listening for unit creation for ["..context:faction():name().."]")
+                                core:remove_listener("rm_granted_unit_to_ai_force")
+                            end,
+                            false)
                     end
                     -- refund reasury the lost gold value of the force
                     local refund = prior_value - cm:force_gold_value(force_cqi)
                     cm:treasury_mod(character:faction():name(), refund)
-                    rm:log("refunded "..refund.."g for lost value")
+                    rm:log("refunded ["..refund.."]g for lost value (["..prior_value.."] - ["..cm:force_gold_value(force_cqi).."])")
 
                     break
                 end
