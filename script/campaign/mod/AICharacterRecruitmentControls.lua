@@ -110,6 +110,11 @@ local function rm_ai_recruitment(character, recruited_unit)
                     cm:remove_unit_from_character(cm:char_lookup_str(cqi), unit_to_remove_key)
                     rm:log("removed recruited unit ["..unit_to_remove_key.."] costing ["..rm:get_weight_for_unit(unit_to_remove_key, rm:get_character_by_cqi(cqi)).."] points!")
 
+                    -- refund treasury the gold value of the the removed unit
+                    local refund = recruited_unit:get_unit_custom_battle_cost()
+                    cm:treasury_mod(character:faction():name(), refund)
+                    rm:log("refunded ["..refund.."]g for lost value")
+
                     -- pick a random default unit
                     local default_units = rm:ai_subculture_defaults()[character:faction():subculture()]
                     local unit_to_add_idx = cm:random_number(#default_units)
@@ -153,11 +158,6 @@ local function rm_ai_recruitment(character, recruited_unit)
                             end,
                             false)
                     end
-                    -- refund treasury the gold value of the the removed unit
-                    local refund = recruited_unit:get_unit_custom_battle_cost()
-                    cm:treasury_mod(character:faction():name(), refund)
-                    rm:log("refunded ["..refund.."]g for lost value")
-
                     break
                 end
             end
