@@ -118,7 +118,7 @@ local function limit_character(character, groupID, difference)
         end
     end
 end
-    
+
 --v function(character: CA_CHAR, recruited_unit: CA_UNIT)
 local function rm_ai_recruitment(character, recruited_unit)
     local rec_char = rm:get_character_by_cqi(character:command_queue_index())
@@ -146,8 +146,6 @@ local function rm_ai_recruitment(character, recruited_unit)
                     local force = character:military_force()
                     local force_cqi = force:command_queue_index()
 
-                    -- get the force's value pre-removal
-                    local prior_value = cm:force_gold_value(force_cqi)
                     -- remove it
                     cm:remove_unit_from_character(cm:char_lookup_str(cqi), unit_to_remove_key)
                     rm:log("removed recruited unit ["..unit_to_remove_key.."] costing ["..rm:get_weight_for_unit(unit_to_remove_key, rm:get_character_by_cqi(cqi)).."] points!")
@@ -179,8 +177,8 @@ local function rm_ai_recruitment(character, recruited_unit)
                             end,
                             function(context)
                                 local unit_cost = context:unit():get_unit_custom_battle_cost()
-                                cm:treasury_mod(character:faction():name(), unit_cost)
-                                rm:log("charged ["..context:unit():get_unit_custom_battle_cost().."]g for replacement unit ["..context:unit():unit_key().."]")
+                                cm:treasury_mod(character:faction():name(), -unit_cost)
+                                rm:log("charged ["..unit_cost.."]g for replacement unit ["..context:unit():unit_key().."]")
                             end,
                             false)
                         core:add_listener(
@@ -195,10 +193,10 @@ local function rm_ai_recruitment(character, recruited_unit)
                             end,
                             false)
                     end
-                    -- refund reasury the lost gold value of the force
-                    local refund = prior_value - cm:force_gold_value(force_cqi)
+                    -- refund treasury the gold value of the the removed unit
+                    local refund = recruited_unit:get_unit_custom_battle_cost()
                     cm:treasury_mod(character:faction():name(), refund)
-                    rm:log("refunded ["..refund.."]g for lost value (["..prior_value.."] - ["..cm:force_gold_value(force_cqi).."])")
+                    rm:log("refunded ["..refund.."]g for lost value")
 
                     break
                 end
