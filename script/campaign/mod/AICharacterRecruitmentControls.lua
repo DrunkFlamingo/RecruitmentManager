@@ -134,6 +134,7 @@ local function rm_ai_recruitment(character, recruited_unit)
                         -- add the selected default unit
                         cm:grant_unit_to_character(cm:char_lookup_str(cqi), unit_to_add)
                         rm:log("granted ["..unit_to_add.."] as a replacement core unit")
+                        local character_faction = character:faction():name()
                         core:add_listener(
                             "rm_granted_unit_to_ai_force",
                             "UnitCreated",
@@ -142,7 +143,7 @@ local function rm_ai_recruitment(character, recruited_unit)
                             end,
                             function(context)
                                 local unit_cost = context:unit():get_unit_custom_battle_cost()
-                                cm:treasury_mod(character:faction():name(), -unit_cost)
+                                cm:treasury_mod(character_faction, -unit_cost)
                                 rm:log("charged ["..unit_cost.."]g for replacement unit ["..context:unit():unit_key().."]")
                             end,
                             false)
@@ -150,7 +151,7 @@ local function rm_ai_recruitment(character, recruited_unit)
                             "rm_granted_unit_to_ai_force_gc",
                             "FactionTurnEnd",
                             function(context)
-                                return context:faction():name() == character:faction():name()
+                                return context:faction():name() == character_faction
                             end,
                             function(context)
                                 rm:log("ending listening for unit creation for ["..context:faction():name().."]")
