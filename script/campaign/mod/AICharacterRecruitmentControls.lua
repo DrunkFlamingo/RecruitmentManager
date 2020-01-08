@@ -147,17 +147,6 @@ local function rm_ai_recruitment(character, recruited_unit)
                                 rm:log("charged ["..unit_cost.."]g for replacement unit ["..context:unit():unit_key().."]")
                             end,
                             false)
-                        core:add_listener(
-                            "rm_granted_unit_to_ai_force_gc",
-                            "FactionTurnEnd",
-                            function(context)
-                                return context:faction():name() == character_faction
-                            end,
-                            function(context)
-                                rm:log("ending listening for unit creation for ["..context:faction():name().."]")
-                                core:remove_listener("rm_granted_unit_to_ai_force")
-                            end,
-                            false)
                     end
                     break
                 end
