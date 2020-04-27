@@ -7,7 +7,6 @@ require("RecruitmentPanelUIImplementation")
 require("UICharacterPathSettings")
 
 --export helpers
-require("export_helpers__recruitment_control_monitor")
+require("RecruitmentControlsMeter")
 require("export_helpers__tt_groups")
-require("export_helpers__custom_unit_template")
 

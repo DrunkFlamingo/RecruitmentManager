@@ -113,6 +113,23 @@ core:add_listener(
                 end
             end
         end
+        if rec_char._queueNum > 0 then
+            local can_auth = true --:boolean
+            cm:remove_callback("RMauth")
+            cm:callback(function() 
+                local queue_element = find_uicomponent(core:get_ui_root(), "units_panel", "main_units_panel", "units", "QueuedLandUnit "..rec_char._queueNum - 1)
+                if can_auth and not queue_element then
+                    rm:log("Queue Authentication failed!")
+                    can_auth = false 
+                    cm:callback(function() 
+                        rec_char:set_queue_stale()
+                        rm:check_all_units_on_character(rec_char)
+                        rm:enforce_all_units_on_current_character()
+                        can_auth = true
+                    end, 0.1, "RMauth2")
+                end
+            end, 0.1, "RMauth")
+        end
     end,
     true
 )

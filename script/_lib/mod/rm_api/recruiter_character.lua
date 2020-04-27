@@ -17,6 +17,7 @@ function recruiter_character.new(manager, cqi)
     self._manager = manager  -- stores the associated rm
     self._armyCounts = {} --:map<string, number> --stores the current number of each unit in the army
     self._queueCounts = {} --:map<string, number> --same as above but for queues
+    self._queueNum = 0 --:int
     -- stores the units currently restricted for the character
     self._restrictedUnits = {} --:map<string, boolean> 
     -- stores the units currently hidden for the character
@@ -198,6 +199,7 @@ function recruiter_character.wipe_queue(self)
     for unit, _ in pairs(self:get_queue_counts()) do 
         self._queueCounts[unit] = 0
     end
+    self._queueNum = 0
 end
 
 --remove all units from the army
@@ -236,6 +238,7 @@ function recruiter_character.add_unit_to_queue(self, unitID)
         --if that unit hasn't been used yet, give it a default value.
     end
     self._queueCounts[unitID] = self._queueCounts[unitID] + 1;
+    self._queueNum = self._queueNum + 1;
     self:log("Added unit ["..unitID.."] to the queue of ["..tostring(self:command_queue_index()).."]")
 end
 
@@ -336,6 +339,7 @@ function recruiter_character.remove_unit_from_queue(self, unitID)
         return false 
     end
     self._queueCounts[unitID] = self._queueCounts[unitID] - 1;
+    self._queueNum = self._queueNum - 1;
     self:log("Removed unit ["..unitID.."] to the queue of ["..tostring(self:command_queue_index()).."]")
     return true
 end
@@ -518,6 +522,12 @@ end
 
 --v function(self: RECRUITER_CHARACTER, groupID: string) --> number
 function recruiter_character.get_group_counts_on_character(self, groupID)
+    if self._staleArmyFlag then
+        self:refresh_army()
+    end
+    if self._staleQueueFlag then
+        self:refresh_queue() 
+    end
     if not self._groupCounts[groupID] then
         self._groupCounts[groupID] = 0
         --set a default
