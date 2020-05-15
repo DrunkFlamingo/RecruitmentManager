@@ -503,7 +503,7 @@ end
 
 --v [NO_CHECK] function(self: RECRUITER_CHARACTER, groupID: string) --> number
 function recruiter_character.get_quantity_limit_for_group(self, groupID)
-    --for now, this just returns a pointer to where the default value is stored in the model for all characters.
+    --for now, this just returns where the default value is stored in the model for all characters.
     --in the future, this will allow me to insert code here to add or subtract capacity based on the character's subtype, traits, skills or effects.
     --TODO Character cap increases or penalties
     return self:manager():get_base_quantity_limit_for_group(groupID)

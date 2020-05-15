@@ -219,6 +219,9 @@ function recruiter_manager.init()
     self._overrideSkillRequirements = {} --:map<string, map<string, string>>
     --same for traits
     self._overrideTraitRequirements = {} --:map<string, map<string, string>>
+    --stores descriptive badgets for lord subtypes
+    self._subtypeSpecialRules = {} --:map<string, string>
+
 
     --stores recruiter characters in some structures that are useful.
     self._recruiterCharacters =  {} --:map<CA_CQI, RECRUITER_CHARACTER>
