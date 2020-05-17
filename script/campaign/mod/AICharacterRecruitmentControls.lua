@@ -7,15 +7,15 @@ local subculture_defaults = {
     ["wh_main_sc_brt_bretonnia"] = {"wh_main_brt_cav_knights_of_the_realm", "wh_dlc07_brt_inf_men_at_arms_2", "wh_main_brt_inf_peasant_bowmen", "wh_main_brt_cav_knights_of_the_realm"},
     ["wh_main_sc_chs_chaos"] = {"wh_main_chs_inf_chaos_warriors_0", "wh_main_chs_cav_chaos_chariot", "wh_main_chs_inf_chaos_warriors_0", "wh_main_chs_inf_chaos_warriors_0", "wh_dlc01_chs_inf_forsaken_0"},
     ["wh_main_sc_grn_greenskins"] = {"wh_main_grn_inf_orc_big_uns", "wh_dlc06_grn_inf_nasty_skulkers_0", "wh_main_grn_inf_orc_arrer_boyz"},
-    ["wh_main_sc_grn_savage_orcs"] = {"wh_main_grn_inf_savage_orc_big_uns","wh_main_grn_inf_savage_orc_arrer_boyz"},
+    ["wh_main_sc_grn_savage_orcs"] = {"wh_main_grn_inf_savage_orc_big_uns", "wh_main_grn_inf_savage_orc_arrer_boyz"},
     ["wh_main_sc_nor_norsca"] = {"wh_main_nor_inf_chaos_marauders_0", "wh_dlc08_nor_inf_marauder_hunters_1", "wh_main_nor_inf_chaos_marauders_0", "wh_dlc08_nor_inf_marauder_spearman_0", "wh_main_nor_cav_marauder_horsemen_0"},
-    ["wh_main_sc_vmp_vampire_counts"] = {"wh_main_vmp_inf_crypt_ghouls"}, 
+    ["wh_main_sc_vmp_vampire_counts"] = {"wh_main_vmp_inf_crypt_ghouls", "wh_main_vmp_inf_skeleton_warriors_0", "wh_main_vmp_inf_skeleton_warriors_1", "wh_main_vmp_inf_zombie"}, 
     ["wh2_dlc09_sc_tmb_tomb_kings"] = {"wh2_dlc09_tmb_inf_nehekhara_warriors_0", "wh2_dlc09_tmb_inf_skeleton_archers_0", "wh2_dlc09_tmb_veh_skeleton_archer_chariot_0", "wh2_dlc09_tmb_inf_nehekhara_warriors_0"},
-    ["wh2_main_sc_def_dark_elves"] = {"wh2_main_def_inf_black_ark_corsairs_0","wh2_main_def_inf_darkshards_0", "wh2_main_def_inf_dreadspears_0"},
-    ["wh2_main_sc_hef_high_elves"] = {"wh2_main_hef_inf_spearmen_0", "wh2_main_hef_inf_spearmen_0", "wh2_main_hef_inf_archers_1", "wh2_main_hef_cav_silver_helms_0", "wh2_main_hef_inf_lothern_sea_guard_1"},
-    ["wh2_main_sc_lzd_lizardmen"] = {"wh2_main_lzd_inf_saurus_warriors_1", "wh2_main_lzd_inf_saurus_spearmen_0", "wh2_main_lzd_inf_saurus_warriors_1", "wh2_main_lzd_inf_skink_cohort_1"},
+    ["wh2_main_sc_def_dark_elves"] = {"wh2_main_def_inf_black_ark_corsairs_0","wh2_main_def_inf_darkshards_0", "wh2_main_def_inf_dreadspears_0","wh2_main_def_inf_darkshards_1", "wh2_main_def_inf_bleakswords_0"},
+    ["wh2_main_sc_hef_high_elves"] = {"wh2_main_hef_inf_spearmen_0", "wh2_main_hef_inf_archers_0", "wh2_main_hef_inf_archers_1", "wh2_main_hef_cav_silver_helms_0", "wh2_main_hef_inf_lothern_sea_guard_1"},
+    ["wh2_main_sc_lzd_lizardmen"] = {"wh2_main_lzd_inf_saurus_warriors_0", "wh2_main_lzd_inf_saurus_spearmen_0", "wh2_main_lzd_inf_saurus_warriors_1", "wh2_main_lzd_inf_skink_cohort_1"},
     ["wh2_main_sc_skv_skaven"]  = {"wh2_main_skv_inf_clanrats_1", "wh2_main_skv_inf_clanrat_spearmen_1", "wh2_main_skv_inf_night_runners_1"},
-    ["wh2_dlc11_sc_cst_vampire_coast"] = {"wh2_dlc11_cst_inf_zombie_gunnery_mob_0", "wh2_dlc11_cst_inf_zombie_gunnery_mob_0", "wh2_dlc11_cst_inf_zombie_gunnery_mob_1", "wh2_dlc11_cst_mon_bloated_corpse_0", "wh2_dlc11_cst_inf_zombie_deckhands_mob_1"}
+    ["wh2_dlc11_sc_cst_vampire_coast"] = {"wh2_dlc11_cst_inf_zombie_deckhands_mob_0", "wh2_dlc11_cst_inf_zombie_gunnery_mob_0", "wh2_dlc11_cst_inf_zombie_gunnery_mob_1", "wh2_dlc11_cst_inf_zombie_deckhands_mob_1"}
 } --:map<string, vector<string>>
 
 for subculture, unit_vector in pairs(subculture_defaults) do
@@ -79,9 +79,81 @@ local function limit_character(character, groupID, difference)
     end
 end
 
+--v function(character: CA_CHAR, recruited_unit: CA_UNIT)
+local function rm_ai_recruitment(character, recruited_unit)
+    local rec_char = rm:get_character_by_cqi(character:command_queue_index())
+    local unit_to_remove_key = recruited_unit:unit_key()
+    if cm:char_is_mobile_general_with_army(character) then
+        -- get current group totals
+        local unit_list = character:military_force():unit_list()
+        local unit_totals = {} --:map<string, number>
+        local group_totals = {} --:map<string, number>
+        for j = 0, unit_list:num_items() - 1 do
+            local unit = unit_list:item_at(j):unit_key()
+            local groups_list = rm:get_unit(unit, rec_char):groups()
+            for groupID, _ in pairs(groups_list) do
+                increment_group_total(group_totals, groupID, rm:get_weight_for_unit(unit, rec_char))
+            end
+        end
+        -- check each group the new unit belongs to to ensure it's in-limit
+        for groupID, quantity in pairs(group_totals) do
+            if rm:get_unit(unit_to_remove_key, rec_char):has_group(groupID) then
+                local limit = rec_char:get_quantity_limit_for_group(groupID)
+                -- if not, replace it with a default core unit
+                if quantity > limit then
+                    rm:log("["..groupID.."] is over limit by ["..quantity.."/"..limit.."] points!")
+                    local cqi = character:command_queue_index()
+                    local force = character:military_force()
+                    local force_cqi = force:command_queue_index()
 
+                    -- remove it
+                    cm:remove_unit_from_character(cm:char_lookup_str(cqi), unit_to_remove_key)
+                    rm:log("removed recruited unit ["..unit_to_remove_key.."] costing ["..rm:get_weight_for_unit(unit_to_remove_key, rm:get_character_by_cqi(cqi)).."] points!")
 
+                    -- refund treasury the gold value of the the removed unit
+                    local refund = recruited_unit:get_unit_custom_battle_cost()
+                    cm:treasury_mod(character:faction():name(), refund)
+                    rm:log("refunded ["..refund.."]g for lost value")
 
+                    -- pick a random default unit
+                    local default_units = rm:ai_subculture_defaults()[character:faction():subculture()]
+                    local unit_to_add_idx = cm:random_number(#default_units)
+                    local unit_to_add = default_units[unit_to_add_idx]
+                    local tries = 1
+                    while not force:can_recruit_unit(unit_to_add) and tries < #default_units do
+                        -- retry
+                        unit_to_add_idx = (unit_to_add_idx % #default_units) + 1
+                        unit_to_add = default_units[unit_to_add_idx]
+                        tries = tries + 1
+                    end
+
+                    -- stop here if there's no default unit recruitable selected
+                    if unit_to_add == nil then
+                        rm:log("couldn't recruit any randomly selected core unit!")
+                    else
+                        -- add the selected default unit
+                        cm:grant_unit_to_character(cm:char_lookup_str(cqi), unit_to_add)
+                        rm:log("granted ["..unit_to_add.."] as a replacement core unit")
+                        local character_faction = character:faction():name()
+                        core:add_listener(
+                            "rm_granted_unit_to_ai_force",
+                            "UnitCreated",
+                            function(context)
+                                return context:unit():unit_key() == unit_to_add
+                            end,
+                            function(context)
+                                local unit_cost = context:unit():get_unit_custom_battle_cost()
+                                cm:treasury_mod(character_faction, -unit_cost)
+                                rm:log("charged ["..unit_cost.."]g for replacement unit ["..context:unit():unit_key().."]")
+                            end,
+                            false)
+                    end
+                    break
+                end
+            end
+        end
+    end
+end
 
 --v function(character: CA_CHAR)
 local function rm_ai_character(character)
@@ -105,7 +177,6 @@ local function rm_ai_character(character)
         end
     end
 end
-
 
 --v function(faction:CA_FACTION)
 local function rm_ai_evaluation(faction)
@@ -144,12 +215,7 @@ local function rm_ai_evaluation(faction)
     end, 0.1)
 end
 
-
-
-
-
-
-
+--[[ Use recruitment listener instead to avoid interfering with non-recruited units like lizardman rites or starting LL armies
 core:add_listener(
     "RecruitmentControlsAI",
     "FactionTurnStart",
@@ -160,21 +226,49 @@ core:add_listener(
         rm_ai_evaluation(context:faction())
     end,
     true
-)
+) --]]
 
+--v function(context:CA_UNIT_CONTEXT) --> boolean
+local function should_handle_new_ai_unit(context)
+    return (not context:unit():faction():is_human()) and
+    (rm:should_enforce_ai_restrictions()) and
+    (context:unit():faction():name() ~= "rebels") and
+    (rm:ai_subculture_defaults()[context:unit():faction():subculture()] ~= nil)
+end
 
---[[ --TODO unit pools
+--v function(context:CA_UNIT_CONTEXT)
+local function handle_new_ai_unit(context)
+        rm:log("AI faction ["..context:unit():faction():name().."] has recruited a unit ["..context:unit():unit_key().."]")
+    if context:unit():has_force_commander() then
+        rm_ai_recruitment(context:unit():force_commander(), context:unit())
+    else
+        rm:log("unit recruited without force commander?!")
+    end
+
+    --[[ --TODO unit pools
+    local unit = context:unit() --:CA_UNIT
+    if rm:unit_has_pool(unit:unit_key()) then
+        rm:change_unit_pool(unit:unit_key(), unit:faction():name(), -1)
+    end
+    -- ]]
+end
+
 core:add_listener(
     "RecruitmentControlsAIUnitTrained",
     "UnitTrained",
+    should_handle_new_ai_unit,
+    handle_new_ai_unit,
+    true
+)
+
+--[[ TODO Investigate any uses of the UnitCreated event - seems to fire before recruitment, but also for garrison expansion
+core:add_listener(
+    "RecruitmentControlsAIUnitTrained",
+    "UnitCreated",
+    should_handle_new_ai_unit,
     function(context)
-        return (not context:unit():faction():is_human())
-    end,
-    function(context)
-        local unit = context:unit() --:CA_UNIT
-        if rm:unit_has_pool(unit:unit_key()) then
-            rm:change_unit_pool(unit:unit_key(), unit:faction():name(), -1)
-        end
+        rm:log("AI faction ["..context:unit():faction():name().."] has >>CREATED<< a unit ["..context:unit():unit_key().."]!")
     end,
     true
-)--]]
+)
+--]]

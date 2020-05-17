@@ -8,6 +8,7 @@
 --# assume global class CA_Component
 --# assume global class CA_UIContext
 --# assume global class CA_CHAR_CONTEXT
+--# assume global class CA_UNIT_CONTEXT
 --# assume global class CA_SETTLEMENT_CONTEXT
 --# assume global class CA_CQI
 --# assume global class CA_CHAR
@@ -69,6 +70,7 @@
 --# assume CA_UIContext.string: string
 --# assume CA_SETTLEMENT_CONTEXT.garrison_residence: method() --> CA_GARRISON_RESIDENCE
 --# assume CA_CHAR_CONTEXT.character: method() --> CA_CHAR
+--# assume CA_UNIT_CONTEXT.unit: method() --> CA_UNIT
 
 -- UIC
 --# assume CA_UIC.Address: method() --> CA_Component
