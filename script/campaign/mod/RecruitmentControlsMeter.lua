@@ -69,7 +69,7 @@ local function update_display(uic, rec_char, groupID)
     end
     if name and quantity and cap then
         local tt_string = "You have used "..tostring(quantity).." of the "..tostring(cap).." "..name.." points available to this force!"
-        uic:SetTooltipText(tt_string)
+        uic:SetTooltipText(tt_string, true)
     end
 end
 

@@ -1,5 +1,5 @@
---grab rm, cm and events
-events = get_events(); cm = get_cm(); rm = _G.rm;
+--grab rm, cm
+cm = get_cm(); rm = _G.rm;
 
 
 local units = {
@@ -33,13 +33,13 @@ local units = {
     {"wh_dlc04_emp_cav_knights_blazing_sun_0", "emp_special", 2},
     {"wh_dlc04_emp_inf_flagellants_0", "emp_special", 1},
     {"wh2_dlc13_emp_inf_huntsmen_0", "emp_special", 1},
+    {"wh2_dlc13_emp_veh_war_wagon_0", "emp_special", 2},
+    {"wh2_dlc13_emp_veh_war_wagon_1", "emp_special", 3},
     --RARE
     {"wh_main_emp_art_helblaster_volley_gun", "emp_rare", 2},
     {"wh_main_emp_art_helstorm_rocket_battery", "emp_rare", 2},
     {"wh_main_emp_veh_luminark_of_hysh_0", "emp_rare", 3},
     {"wh_main_emp_veh_steam_tank", "emp_rare", 3},
-    {"wh2_dlc13_emp_veh_war_wagon_0", "emp_rare", 1},
-    {"wh2_dlc13_emp_veh_war_wagon_1", "emp_rare", 2},
     {"wh2_dlc13_emp_veh_war_wagon_ror_0", "emp_rare", 1},
     
     -------ROR-------
@@ -73,7 +73,7 @@ local units = {
     {"wh2_dlc13_emp_inf_greatswords_ror_0", "emp_special", 1},
     {"wh2_dlc13_emp_cav_empire_knights_ror_1", "emp_special", 1},
     {"wh2_dlc13_emp_art_mortar_ror_0", "emp_special", 1},
-    {"wh2_dlc13_emp_cav_outriders_ror_0", "emp_special", 1},
+    {"wh2_dlc13_emp_cav_outriders_ror_0", "emp_special", 2},
     --RARE
     {"wh2_dlc13_emp_veh_steam_tank_ror_0", "emp_rare", 3},
     
@@ -92,7 +92,7 @@ local units = {
     {"wh2_dlc13_emp_cav_reiksguard_imperial_supply", "emp_special", 1},
     {"wh2_dlc13_emp_inf_greatswords_imperial_supply", "emp_special", 1},
     {"wh2_dlc13_emp_inf_huntsmen_0_imperial_supply", "emp_special", 1},
-    {"wh2_dlc13_huntmarshall_veh_obsinite_gyrocopter_0_mercenary", "emp_special", 1},
+    {"wh2_dlc13_huntmarshall_veh_obsinite_gyrocopter_0_mercenary", "emp_special", 2},
     --RARE
     {"wh2_dlc13_emp_art_helblaster_volley_gun_imperial_supply", "emp_rare", 2},
     {"wh2_dlc13_emp_art_helstorm_rocket_battery_imperial_supply","emp_rare", 2},
@@ -140,6 +140,7 @@ local units = {
     --CORE
     {"wh_dlc06_dwf_inf_ekrund_miners_0", "dwf_core"},
     {"wh_dlc06_dwf_inf_warriors_dragonfire_pass_0", "dwf_core"},
+    {"wh_dlc06_dwf_old_grumblers_0", "dwf_core"},
     --SPECIAL
     {"wh_dlc06_dwf_inf_dragonback_slayers_0", "dwf_special", 1},
     {"wh_dlc06_dwf_inf_peak_gate_guard_0", "dwf_special", 2},
@@ -268,6 +269,7 @@ local units = {
     {"wh_main_grn_inf_savage_orc_big_uns", "grn_core"},
     {"wh_main_grn_inf_savage_orcs", "grn_core"},
     {"wh_dlc06_grn_inf_nasty_skulkers_0", "grn_core"},
+
     --SPECIAL
     {"wh_main_grn_cav_goblin_wolf_chariot", "grn_special", 1},
     {"wh_main_grn_cav_orc_boar_boy_big_uns", "grn_special", 2},
@@ -276,14 +278,22 @@ local units = {
     {"wh_main_grn_cav_savage_orc_boar_boy_big_uns", "grn_special", 2},
     {"wh_main_grn_cav_savage_orc_boar_boyz", "grn_special", 1},
     {"wh_main_grn_inf_black_orcs", "grn_special", 2},
-    {"wh_main_grn_mon_trolls", "grn_special", 2},
+    {"wh_main_grn_mon_trolls", "grn_special", 1},
     {"wh_dlc06_grn_cav_squig_hoppers_0", "grn_special", 2},
     {"wh_dlc06_grn_inf_squig_herd_0", "grn_special", 1},
+    {"wh2_dlc15_grn_mon_river_trolls_0", "grn_special", 2},
+    {"wh2_dlc15_grn_mon_stone_trolls_0", "grn_special", 2},
+    {"wh2_dlc15_grn_veh_snotling_pump_wagon_0", "grn_special", 1},
+
     --RARE
     {"wh_main_grn_art_doom_diver_catapult", "grn_rare", 2},
     {"wh_main_grn_art_goblin_rock_lobber", "grn_rare", 1},
     {"wh_main_grn_mon_arachnarok_spider_0", "grn_rare", 3},
     {"wh_main_grn_mon_giant", "grn_rare", 2},
+    {"wh2_dlc15_grn_mon_rogue_idol_0", "grn_rare", 3},
+    {"wh2_dlc15_grn_veh_snotling_pump_wagon_0", "grn_rare", 1},
+    {"wh2_dlc15_grn_veh_snotling_pump_wagon_flappas_0", "grn_rare", 1},
+    {"wh2_dlc15_grn_veh_snotling_pump_wagon_roller_0", "grn_rare", 1},
     
     -------ROR-------
     --CORE
@@ -298,10 +308,25 @@ local units = {
     {"wh_dlc06_grn_inf_da_rusty_arrers_0", "grn_special", 1},
     {"wh_dlc06_grn_cav_durkits_squigs_0", "grn_special", 2},
     {"wh_dlc06_grn_cav_broken_tusks_mob_0", "grn_special", 2},
+    {"wh2_dlc15_grn_mon_river_trolls_ror_0", "grn_special", 2},
     --RARE
     {"wh_dlc06_grn_mon_venom_queen_0", "grn_rare", 3},
     {"wh_dlc06_grn_art_hammer_of_gork_0", "grn_rare", 1},
-    
+    {"wh2_dlc15_grn_mon_rogue_idol_ror_0", "grn_rare", 3},
+    {"wh2_dlc15_grn_veh_snotling_pump_wagon_ror_0", "grn_rare", 1},
+
+    -------WAAAGH UNITS-------
+    --CORE
+    {"wh2_dlc15_grn_cav_forest_goblin_spider_riders_waaagh_0", "grn_core"},
+    {"wh_dlc06_grn_inf_squig_explosive_0", "grn_core"},
+    --SPECIAL
+    {"wh2_dlc15_grn_cav_squig_hoppers_waaagh_0", "grn_special", 2},
+   --RARE
+    {"wh2_dlc15_grn_mon_feral_hydra_waaagh_0", "grn_rare", 2},
+    {"wh2_dlc15_grn_mon_wyvern_waaagh_0", "grn_rare", 1},
+    {"wh_dlc15_grn_mon_arachnarok_spider_waaagh_0", "grn_rare", 3},
+
+
     ---------------------------------------------------------------
     --WARRIORS OF CHAOS
     ---------------------------------------------------------------
@@ -405,31 +430,49 @@ local units = {
     {"wh_dlc05_wef_inf_dryads_0", "wef_core"},
     {"wh_dlc05_wef_inf_eternal_guard_0", "wef_core"},
     {"wh_dlc05_wef_inf_eternal_guard_1", "wef_core"},
+    {"wh_dlc16_wef_cav_glade_riders_2", "wef_core"},
+    {"wh2_dlc16_wef_inf_malicious_dryads_0", "wef_core"},
+    {"wh2_dlc16_wef_mon_cave_bats", "wef_core"},
+    {"wh2_dlc16_wef_mon_spider_hatchlings_0", "wef_core"},
     --SPECIAL
     {"wh_dlc05_wef_inf_deepwood_scouts_0", "wef_special", 1},
     {"wh_dlc05_wef_inf_deepwood_scouts_1", "wef_special", 1},
-    {"wh_dlc05_wef_mon_treekin_0", "wef_special", 2}, --ORION AMBER
-    {"wh_dlc05_wef_cav_hawk_riders_0", "wef_special", 2}, --ORION AMBER
-    {"wh_dlc05_wef_inf_wardancers_0", "wef_special", 1}, --DURTHU AMBER
-    {"wh_dlc05_wef_inf_wardancers_1", "wef_special", 1}, --DURTHU AMBER
-    {"wh_dlc05_wef_inf_wildwood_rangers_0", "wef_special", 2}, --DURTHU AMBER
+    {"wh_dlc05_wef_mon_treekin_0", "wef_special", 2},
+    {"wh_dlc05_wef_mon_great_eagle_0", "wef_special", 2},
+    {"wh_dlc05_wef_cav_hawk_riders_0", "wef_special", 2},
+    {"wh_dlc05_wef_inf_wardancers_0", "wef_special", 1},
+    {"wh_dlc05_wef_inf_wardancers_1", "wef_special", 1},
+    {"wh_dlc05_wef_inf_wildwood_rangers_0", "wef_special", 2},
     {"wh_dlc05_wef_cav_wild_riders_0", "wef_special", 2},
     {"wh_dlc05_wef_cav_wild_riders_1", "wef_special", 2},
+    {"wh2_dlc16_wef_inf_bladesingers_0", "wef_special", 2},
+    {"wh2_dlc16_wef_mon_giant_spiders_0", "wef_special", 1},
+    {"wh2_dlc16_wef_mon_feral_manticore", "wef_special", 2},
+    {"wh2_dlc16_wef_mon_harpies_0", "wef_special", 1},
+    {"wh2_dlc16_wef_mon_hawks_0", "wef_special", 1},
+    {"wh2_dlc16_wef_mon_malicious_treekin_0", "wef_special", 2},
+    {"wh2_dlc16_wef_mon_wolves_0", "wef_special", 1},
     --RARE
-    {"wh_dlc05_wef_forest_dragon_0", "wef_rare", 3}, --ORION AMBER
-    {"wh_dlc05_wef_mon_great_eagle_0", "wef_rare", 1}, --ORION AMBER
-    {"wh_dlc05_wef_mon_treeman_0", "wef_rare", 3}, --ORION AMBER
-    {"wh_dlc05_wef_inf_waywatchers_0", "wef_rare", 1}, --DURTHU AMBER
-    {"wh_dlc05_wef_cav_sisters_thorn_0", "wef_rare", 1}, --DURTHU AMBER
+    {"wh_dlc05_wef_forest_dragon_0", "wef_rare", 3},
+    {"wh_dlc05_wef_mon_treeman_0", "wef_rare", 3},
+    {"wh_dlc05_wef_inf_waywatchers_0", "wef_rare", 1},
+    {"wh_dlc05_wef_cav_sisters_thorn_0", "wef_rare", 1},
+    {"wh_dlc16_wef_cav_great_stag_knights_0", "wef_rare", 1},
+    {"wh2_dlc16_wef_mon_malicious_treeman_0", "wef_rare", 3},
+    {"wh2_dlc16_wef_mon_zoats", "wef_rare", 1},
     -------ROR-------
     --CORE
     {"wh_pro04_wef_inf_eternal_guard_ror_0", "wef_core"},
+    {"wh2_dlc16_wef_inf_dryads_ror_0", "wef_core"},
     --SPECIAL
     {"wh_pro04_wef_inf_wildwood_rangers_ror_0", "wef_special", 2},
     {"wh_pro04_wef_inf_wardancers_ror_0", "wef_special", 1},
     {"wh_pro04_wef_inf_waywatchers_ror_0", "wef_rare", 1},
     {"wh_pro04_wef_cav_wild_riders_ror_0", "wef_special", 2},
     {"wh_pro04_wef_mon_treekin_ror_0", "wef_special", 2},
+    --RARE
+    {"wh2_dlc16_wef_cav_great_stag_knights_ror_0", "wef_rare", 2},
+    {"wh2_dlc16_wef_mon_zoats_ror_0", "wef_rare", 1},
     
     
     ---------------------------------------------------------------
@@ -453,7 +496,7 @@ local units = {
     {"wh_main_nor_mon_chaos_trolls", "nor_special", 2},
     {"wh_dlc08_nor_mon_warwolves_0", "nor_special", 1},
     {"wh_dlc08_nor_mon_norscan_ice_trolls_0", "nor_special", 2},
-    {"wh_dlc08_nor_feral_manticore", "nor_special", 2},
+    {"wh_dlc08_nor_feral_manticore", "nor_special", 1},
     {"wh_dlc08_nor_inf_marauder_berserkers_0", "nor_special", 1},
     {"wh_dlc08_nor_inf_marauder_champions_0", "nor_special", 2},
     {"wh_dlc08_nor_inf_marauder_champions_1", "nor_special", 2},
@@ -471,9 +514,9 @@ local units = {
     
     ------- MONSTER HUNTS / GOD ALLEGIANCE REWARDS-------
     --RARE
-    {"wh_dlc08_nor_mon_frost_wyrm_ror_0", "nor_rare", 1},
-    {"wh_dlc08_nor_mon_war_mammoth_ror_1", "nor_rare", 1},
-    {"wh_dlc08_nor_art_hellcannon_battery", "nor_rare", 1},
+    {"wh_dlc08_nor_mon_frost_wyrm_ror_0", "nor_rare", 2},
+    {"wh_dlc08_nor_mon_war_mammoth_ror_1", "nor_rare", 2},
+    {"wh_dlc08_nor_art_hellcannon_battery", "nor_rare", 3},
     
     -------ROR-------
     --CORE
@@ -606,12 +649,16 @@ local units = {
     {"wh2_dlc14_skv_inf_eshin_triads_0", "skv_special", 1},
     {"wh2_dlc14_skv_inf_poison_wind_mortar_0", "skv_special", 2},
     {"wh2_dlc14_skv_inf_warp_grinder_0", "skv_special", 1},
+    {"wh2_dlc16_skv_mon_rat_ogre_mutant", "skv_special", 3},
+    {"wh2_dlc16_skv_mon_wolf_rats_0", "skv_special", 1},
+    {"wh2_dlc16_skv_mon_wolf_rats_1", "skv_special", 1},
     --RARE
     {"wh2_main_skv_art_plagueclaw_catapult", "skv_rare", 2},
     {"wh2_main_skv_art_warp_lightning_cannon", "skv_rare", 2},
     {"wh2_main_skv_veh_doomwheel", "skv_rare", 2},
     {"wh2_main_skv_mon_hell_pit_abomination", "skv_rare", 3},
     {"wh2_main_skv_inf_death_globe_bombardiers", "skv_rare", 1},
+    {"wh2_dlc16_skv_mon_brood_horror_0", "skv_rare", 2},
     
     -------IKIT CLAW FORBIDDEN WORKSHOP ROR-------
     --SPECIAL
@@ -621,6 +668,19 @@ local units = {
     {"wh2_dlc12_skv_art_warplock_jezzails_ror_tech_lab_0", "skv_special", 2},
     --RARE
     {"wh2_dlc12_skv_veh_doomwheel_ror_tech_lab_0", "skv_rare", 2},
+    
+    -------THROT'S FLESH LAB ROR-------
+    --CORE
+    {"wh2_dlc16_skv_inf_skavenslaves_0_flesh_lab", "skv_core"},
+    {"wh2_dlc16_skv_inf_skavenslave_spearmen_0_flesh_lab", "skv_core"},
+    --SPECIAL
+    {"wh2_dlc16_skv_mon_rat_ogre_mutant_flesh_lab", "skv_special", 3},
+    {"wh2_dlc16_skv_mon_wolf_rats_0_flesh_lab", "skv_special", 1},
+    {"wh2_dlc16_skv_mon_wolf_rats_1_flesh_lab", "skv_special", 1},
+    {"wh2_dlc16_skv_mon_rat_ogres_flesh_lab", "skv_special", 1},
+    --RARE
+    {"wh2_dlc16_skv_mon_brood_horror_0_flesh_lab", "skv_rare", 2},
+    {"wh2_dlc16_skv_mon_hell_pit_abomination_flesh_lab", "skv_rare", 3},
     
     -------ROR-------
     --CORE
@@ -633,9 +693,13 @@ local units = {
     {"wh2_dlc12_skv_veh_doom_flayer_ror_0", "skv_special", 2},
     {"wh2_dlc14_skv_inf_eshin_triads_ror_0", "skv_special", 1},
     {"wh2_dlc14_skv_inf_poison_wind_mortar_ror_0", "skv_special", 2},
+    {"wh2_dlc14_skv_inf_death_runners_ror_0", "skv_special", 2},
+    {"wh2_dlc16_skv_mon_rat_ogre_mutant_ror_0", "skv_special", 3},
+    {"wh2_dlc16_skv_mon_rat_ogres_ror_0", "skv_special", 2},
     --RARE
     {"wh2_dlc12_skv_art_warp_lightning_cannon_ror_0", "skv_rare", 2},
     {"wh2_dlc12_skv_veh_doomwheel_ror_0", "skv_rare", 2},
+    {"wh2_dlc16_skv_mon_hell_pit_abomination_ror_0", "skv_rare", 3},
     
     
     ---------------------------------------------------------------
@@ -653,6 +717,7 @@ local units = {
     {"wh2_main_hef_cav_ellyrian_reavers_0", "hef_core"},
     {"wh2_main_hef_cav_silver_helms_0", "hef_core"},
     {"wh2_main_hef_cav_silver_helms_1", "hef_core"},
+    {"wh2_dlc15_hef_inf_rangers_0", "hef_core"},
     --SPECIAL
     {"wh2_main_hef_inf_phoenix_guard", "hef_special", 2},
     {"wh2_main_hef_inf_swordmasters_of_hoeth_0", "hef_special", 2},
@@ -660,16 +725,20 @@ local units = {
     {"wh2_main_hef_cav_dragon_princes", "hef_special", 2},
     {"wh2_main_hef_cav_ithilmar_chariot", "hef_special", 2},
     {"wh2_main_hef_cav_tiranoc_chariot", "hef_special", 1},
+    {"wh2_main_hef_mon_great_eagle", "hef_special", 2},
     {"wh2_dlc10_hef_inf_shadow_warriors_0", "hef_special", 1},
+    {"wh2_dlc15_hef_inf_silverin_guard_0", "hef_special", 1},
+    {"wh2_dlc15_hef_mon_war_lions_of_chrace_0", "hef_special", 1},
+    {"wh2_dlc15_hef_veh_lion_chariot_of_chrace_0", "hef_special", 2},
     --RARE
     {"wh2_main_hef_art_eagle_claw_bolt_thrower", "hef_rare", 1},
-    {"wh2_main_hef_mon_great_eagle", "hef_rare", 1},
     {"wh2_main_hef_mon_moon_dragon", "hef_rare", 2},
     {"wh2_main_hef_mon_phoenix_flamespyre", "hef_rare", 1},
     {"wh2_main_hef_mon_phoenix_frostheart", "hef_rare", 1},
     {"wh2_main_hef_mon_star_dragon", "hef_rare", 3},
     {"wh2_main_hef_mon_sun_dragon", "hef_rare", 2},
     {"wh2_dlc10_hef_inf_sisters_of_avelorn_0", "hef_rare", 1},
+    {"wh2_dlc15_hef_mon_arcane_phoenix_0", "hef_rare", 2},
     
     -------FACTION UNIQUES-------
     --CORE
@@ -677,21 +746,34 @@ local units = {
     --SPECIAL
     {"wh2_dlc10_hef_mon_treekin_0", "hef_special", 2}, --ALARIELLE
     {"wh2_dlc10_hef_inf_shadow_walkers_0", "hef_special", 2}, --ALITH ANAR
+    {"wh2_dlc15_hef_inf_mistwalkers_faithbearers_0", "hef_special", 1},  --ELTHARION
+    {"wh2_dlc15_hef_inf_mistwalkers_sentinels_0", "hef_special", 1}, --ELTHARION
+    {"wh2_dlc15_hef_inf_mistwalkers_skyhawks_0", "hef_special", 1}, --ELTHARION
+    {"wh2_dlc15_hef_inf_mistwalkers_spireguard_0", "hef_special", 1}, --ELTHARION
     --RARE
     {"wh2_dlc10_hef_mon_treeman_0", "hef_rare", 3}, --ALARIELLE
+    {"wh2_dlc15_hef_inf_mistwalkers_griffon_knights_0", "hef_rare", 3}, --ELTHARION
+    {"wh2_dlc15_hef_mon_black_dragon_imrik", "hef_rare", 3}, --IMRIK
+    {"wh2_dlc15_hef_mon_forest_dragon_imrik", "hef_rare", 3}, --IMRIK
+    {"wh2_dlc15_hef_mon_moon_dragon_imrik", "hef_rare", 3}, --IMRIK
+    {"wh2_dlc15_hef_mon_star_dragon_imrik", "hef_rare", 3}, --IMRIK
+    {"wh2_dlc15_hef_mon_sun_dragon_imrik", "hef_rare", 2}, --IMRIK
     
     -------ROR-------
     --CORE
     {"wh2_dlc10_hef_inf_the_scions_of_mathlann_ror_0", "hef_core"},
     {"wh2_dlc10_hef_inf_the_storm_riders_ror_0", "hef_core"},
+    {"wh2_dlc15_hef_inf_archers_ror_0", "hef_core"},
     --SPECIAL
     {"wh2_dlc10_hef_inf_the_silverpelts_ror_0", "hef_special", 1},
     {"wh2_dlc10_hef_inf_keepers_of_the_flame_ror_0", "hef_special", 2},
     {"wh2_dlc10_hef_inf_the_grey_ror_0", "hef_special", 1},
     {"wh2_dlc10_hef_cav_the_fireborn_ror_0", "hef_special", 2},
     {"wh2_dlc10_hef_cav_the_heralds_of_the_wind_ror_0", "hef_special", 1},
+    {"wh2_dlc15_hef_mon_war_lions_of_chrace_ror_0", "hef_special", 1},
     --RARE
     {"wh2_dlc10_hef_inf_everqueens_court_guards_ror_0", "hef_rare", 1},
+    {"wh2_dlc15_hef_mon_arcane_phoenix_ror_0", "hef_rare", 2},
     
     
     ---------------------------------------------------------------
@@ -728,8 +810,8 @@ local units = {
     {"wh2_main_def_mon_black_dragon", "def_rare", 3},
     {"wh2_main_def_mon_war_hydra", "def_rare", 2},
     {"wh2_dlc10_def_mon_kharibdyss_0", "def_rare", 2},
-    {"wh2_dlc14_def_mon_bloodwrack_medusa_0", "def_rare", 2},
-    {"wh2_dlc14_def_veh_bloodwrack_shrine_0", "def_rare", 3},
+    {"wh2_dlc14_def_mon_bloodwrack_medusa_0", "def_rare", 1},
+    {"wh2_dlc14_def_veh_bloodwrack_shrine_0", "def_rare", 2},
     
     -------ROR-------
     --CORE

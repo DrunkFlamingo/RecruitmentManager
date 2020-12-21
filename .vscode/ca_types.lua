@@ -103,7 +103,7 @@
 --# assume CA_UIC.SetImagePath: method(path: string, image_index: number?)
 --# assume CA_UIC.SetCanResizeHeight: method(state: boolean)
 --# assume CA_UIC.SetCanResizeWidth: method(state: boolean)
---# assume CA_UIC.SetTooltipText: method(tooltip: string, state: boolean?)
+--# assume CA_UIC.SetTooltipText: method(tooltip: string, state: boolean)
 --# assume CA_UIC.GetStateText: method() --> string
 --# assume CA_UIC.PropagatePriority: method(priority: number)
 --# assume CA_UIC.Priority: method() --> number

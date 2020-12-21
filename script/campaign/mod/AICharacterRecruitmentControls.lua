@@ -148,7 +148,7 @@ end
 
 
 
-
+cm:add_first_tick_callback(function()
 
 core:add_listener(
     "RecruitmentControlsAI",
@@ -161,7 +161,7 @@ core:add_listener(
     end,
     true
 )
-
+end)
 
 --[[ --TODO unit pools
 core:add_listener(

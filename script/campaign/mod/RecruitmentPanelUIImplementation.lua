@@ -1,351 +1,351 @@
---grab rm, cm and events
-events = get_events(); cm = get_cm(); rm = _G.rm;
+cm = get_cm(); rm = _G.rm;
 local ast_line = "**********************************************************************\n"
 
+cm:add_first_tick_callback(function()
+    --add unit added to queue listener
+    core:add_listener(
+        "RecruiterManagerOnRecruitOptionClicked",
+        "ComponentLClickUp",
+        true,
+        function(context)
+            --# assume context: CA_UIContext
+            local unit_component_ID = tostring(UIComponent(context.component):Id())
+            --is our clicked component a unit?
+            if string.find(unit_component_ID, "_recruitable") and UIComponent(context.component):CurrentState() == "active" and (not UIComponent(context.component):GetTooltipText():find("col:red")) then
+                --print_all_uicomponent_children(UIComponent(context.component))
+                --its a unit! steal the users input so that they don't click more shit while we calculate.
+                cm:steal_user_input(true);
+                rm:log("Locking recruitment button for ["..unit_component_ID.."] temporarily");
+                --reduce the string to get the name of the unit.
+                local unitID = string.gsub(unit_component_ID, "_recruitable", "")
+                --add the unit to queue so that our model knows it exists.
+                rm:add_unit_to_character_queue_and_refresh_limits(unitID, rm:current_character())
+                rm:enforce_unit_and_grouped_units(unitID, rm:current_character())
+                rm:output_state(rm:current_character())
+                core:trigger_event("RecruiterManagerGroupCountUpdated", cm:get_character_by_cqi(rm:current_character():command_queue_index()))
+            end
+        end,
+        true);
+    --add unit added to queue from mercenaries listener
+    core:add_listener(
+        "RecruiterManagerOnMercenaryOptionClicked",
+        "ComponentLClickUp",
+        true,
+        function(context)
+            --# assume context: CA_UIContext
+            local unit_component_ID = tostring(UIComponent(context.component):Id())
+            --is our clicked component a unit?
+            if string.find(unit_component_ID, "_mercenary") and UIComponent(context.component):CurrentState() == "active" and (not UIComponent(context.component):GetTooltipText():find("col:red")) then
+                --its a unit! steal the users input so that they don't click more shit while we calculate.
+                cm:steal_user_input(true);
+                rm:log("Locking recruitment button for ["..unit_component_ID.."] temporarily");
+                --reduce the string to get the name of the unit.
+                local unitID = string.gsub(unit_component_ID, "_mercenary", "")
+                --add the unit to queue so that our model knows it exists.
+                rm:add_unit_to_character_queue_and_refresh_limits(unitID, rm:current_character(), true)
+                rm:enforce_unit_and_grouped_units(unitID, rm:current_character())
+                rm:output_state(rm:current_character())
+                core:trigger_event("RecruiterManagerGroupCountUpdated", cm:get_character_by_cqi(rm:current_character():command_queue_index()))
+            end
+        end,
+        true);
 
---add unit added to queue listener
-core:add_listener(
-    "RecruiterManagerOnRecruitOptionClicked",
+    --v function(queuedUnit: CA_UIC) --> string
+    local function GetQueuedUnitClicked(queuedUnit)
+        queuedUnit:SimulateMouseOn();
+        local unitInfo = find_uicomponent(core:get_ui_root(), "UnitInfoPopup", "tx_unit-type");
+        local rawstring = unitInfo:GetStateText();
+        local infostart = string.find(rawstring, "unit/") + 5;
+        local infoend = string.find(rawstring, "]]") - 1;
+        local QueuedUnitName = string.sub(rawstring, infostart, infoend)
+        return QueuedUnitName
+    end
+
+
+    --add queued unit clicked listener 
+    core:add_listener(
+    "RecruiterManagerOnQueuedUnitClicked",
     "ComponentLClickUp",
     true,
     function(context)
         --# assume context: CA_UIContext
-        local unit_component_ID = tostring(UIComponent(context.component):Id())
-        --is our clicked component a unit?
-        if string.find(unit_component_ID, "_recruitable") and UIComponent(context.component):CurrentState() == "active" and (not UIComponent(context.component):GetTooltipText():find("col:red")) then
-            --print_all_uicomponent_children(UIComponent(context.component))
-            --its a unit! steal the users input so that they don't click more shit while we calculate.
-            cm:steal_user_input(true);
-            rm:log("Locking recruitment button for ["..unit_component_ID.."] temporarily");
-            --reduce the string to get the name of the unit.
-            local unitID = string.gsub(unit_component_ID, "_recruitable", "")
-            --add the unit to queue so that our model knows it exists.
-            rm:add_unit_to_character_queue_and_refresh_limits(unitID, rm:current_character())
-            rm:enforce_unit_and_grouped_units(unitID, rm:current_character())
-            rm:output_state(rm:current_character())
-            core:trigger_event("RecruiterManagerGroupCountUpdated", cm:get_character_by_cqi(rm:current_character():command_queue_index()))
+        local component = UIComponent(context.component)
+        local queue_component_ID = tostring(component:Id())
+        if string.find(queue_component_ID, "QueuedLandUnit") then
+            rm:log(ast_line.."\tPATH START: Component Clicked was a Queued Unit!")
+            local unitID = GetQueuedUnitClicked(component)
+            local current_character = rm:current_character()
+            --if we got a unit name, we can just update the counts now.
+            if not is_string(unitID) then
+                rm:log("WARNING: could not find Queued Unit ID directly, setting queue stale and re-evaluating the UI.")
+                current_character:set_queue_stale()
+            end
+            if not current_character:is_queue_stale() then --if we aren't stale, we must have a unit
+                rm:log("Queued Unit name to be removed is: "..unitID)
+                rm:remove_unit_from_character_queue_and_refresh_limits(unitID, current_character)
+                rm:enforce_unit_and_grouped_units(unitID, rm:current_character())
+                rm:output_state(current_character) -- will only fire when logging is enabled.
+                core:trigger_event("RecruiterManagerGroupCountUpdated", cm:get_character_by_cqi(rm:current_character():command_queue_index()))
+            else --backup route.    
+                --if we are stale, we might have a unit, but we don't want to rely on anything here!.
+                cm:remove_callback("RMOnQueue")
+                cm:callback( function() -- we callback this because if we don't do it on a small delay, it will pick up the unit we just cancelled as existing!
+                    --we want to re-evaluate the units who were previously in queue, they may have changed.
+                    local queue_counts = current_character:get_queue_counts() 
+                    rm:check_all_units_on_character(current_character)
+                    rm:enforce_all_units_on_current_character()
+                    rm:output_state(current_character)
+                    core:trigger_event("RecruiterManagerGroupCountUpdated", cm:get_character_by_cqi(rm:current_character():command_queue_index()))
+                end, 0.1, "RMOnQueue")
+            end
         end
     end,
     true);
---add unit added to queue from mercenaries listener
-core:add_listener(
-    "RecruiterManagerOnMercenaryOptionClicked",
+    --add queued mercenary listener
+    core:add_listener(
+    "RecruiterManagerOnQueuedMercenaryClicked",
     "ComponentLClickUp",
     true,
     function(context)
         --# assume context: CA_UIContext
-        local unit_component_ID = tostring(UIComponent(context.component):Id())
-        --is our clicked component a unit?
-        if string.find(unit_component_ID, "_mercenary") and UIComponent(context.component):CurrentState() == "active" and (not UIComponent(context.component):GetTooltipText():find("col:red")) then
-            --its a unit! steal the users input so that they don't click more shit while we calculate.
-            cm:steal_user_input(true);
-            rm:log("Locking recruitment button for ["..unit_component_ID.."] temporarily");
-            --reduce the string to get the name of the unit.
-            local unitID = string.gsub(unit_component_ID, "_mercenary", "")
-            --add the unit to queue so that our model knows it exists.
-            rm:add_unit_to_character_queue_and_refresh_limits(unitID, rm:current_character(), true)
-            rm:enforce_unit_and_grouped_units(unitID, rm:current_character())
-            rm:output_state(rm:current_character())
-            core:trigger_event("RecruiterManagerGroupCountUpdated", cm:get_character_by_cqi(rm:current_character():command_queue_index()))
-        end
-    end,
-    true);
-
---v function(queuedUnit: CA_UIC) --> string
-local function GetQueuedUnitClicked(queuedUnit)
-    queuedUnit:SimulateMouseOn();
-    local unitInfo = find_uicomponent(core:get_ui_root(), "UnitInfoPopup", "tx_unit-type");
-    local rawstring = unitInfo:GetStateText();
-    local infostart = string.find(rawstring, "unit/") + 5;
-    local infoend = string.find(rawstring, "]]") - 1;
-    local QueuedUnitName = string.sub(rawstring, infostart, infoend)
-    return QueuedUnitName
-end
-
-
---add queued unit clicked listener 
-core:add_listener(
-"RecruiterManagerOnQueuedUnitClicked",
-"ComponentLClickUp",
-true,
-function(context)
-    --# assume context: CA_UIContext
-    local component = UIComponent(context.component)
-    local queue_component_ID = tostring(component:Id())
-    if string.find(queue_component_ID, "QueuedLandUnit") then
-        rm:log(ast_line.."\tPATH START: Component Clicked was a Queued Unit!")
-        local unitID = GetQueuedUnitClicked(component)
-        local current_character = rm:current_character()
-        --if we got a unit name, we can just update the counts now.
-        if not is_string(unitID) then
-            rm:log("WARNING: could not find Queued Unit ID directly, setting queue stale and re-evaluating the UI.")
-            current_character:set_queue_stale()
-        end
-        if not current_character:is_queue_stale() then --if we aren't stale, we must have a unit
-            rm:log("Queued Unit name to be removed is: "..unitID)
-            rm:remove_unit_from_character_queue_and_refresh_limits(unitID, current_character)
+        local component = UIComponent(context.component)
+        local queue_component_ID = tostring(component:Id())
+        if string.find(queue_component_ID, "temp_merc_") then
+            local position = queue_component_ID:gsub("temp_merc_", "")
+            rm:log(ast_line.."\tPATH START: Component Clicked was a Queued Mercenary Unit @ ["..position.."]!")
+            local current_character = rm:current_character()
+            local int_pos = tonumber(position)+1 --# assume int_pos: int
+            local unitID = current_character:remove_merc_at_position_returning_key(int_pos)
+            --if we got a unit name, we can just update the counts now.
+            if not unitID then
+                return --no mercenary at this position, do nothing
+            end
+            rm:log("Queued Mercenary name to be removed is: "..unitID)
+            rm:check_individual_unit_on_character(unitID, current_character)
             rm:enforce_unit_and_grouped_units(unitID, rm:current_character())
             rm:output_state(current_character) -- will only fire when logging is enabled.
             core:trigger_event("RecruiterManagerGroupCountUpdated", cm:get_character_by_cqi(rm:current_character():command_queue_index()))
-        else --backup route.    
-            --if we are stale, we might have a unit, but we don't want to rely on anything here!.
-            cm:remove_callback("RMOnQueue")
-            cm:callback( function() -- we callback this because if we don't do it on a small delay, it will pick up the unit we just cancelled as existing!
-                --we want to re-evaluate the units who were previously in queue, they may have changed.
-                local queue_counts = current_character:get_queue_counts() 
-                rm:check_all_units_on_character(current_character)
-                rm:enforce_all_units_on_current_character()
-                rm:output_state(current_character)
-                core:trigger_event("RecruiterManagerGroupCountUpdated", cm:get_character_by_cqi(rm:current_character():command_queue_index()))
-            end, 0.1, "RMOnQueue")
         end
-    end
-end,
-true);
---add queued mercenary listener
-core:add_listener(
-"RecruiterManagerOnQueuedMercenaryClicked",
-"ComponentLClickUp",
-true,
-function(context)
-    --# assume context: CA_UIContext
-    local component = UIComponent(context.component)
-    local queue_component_ID = tostring(component:Id())
-    if string.find(queue_component_ID, "temp_merc_") then
-        local position = queue_component_ID:gsub("temp_merc_", "")
-        rm:log(ast_line.."\tPATH START: Component Clicked was a Queued Mercenary Unit @ ["..position.."]!")
-        local current_character = rm:current_character()
-        local int_pos = tonumber(position)+1 --# assume int_pos: int
-        local unitID = current_character:remove_merc_at_position_returning_key(int_pos)
-         --if we got a unit name, we can just update the counts now.
-        if not unitID then
-            return --no mercenary at this position, do nothing
-        end
-        rm:log("Queued Mercenary name to be removed is: "..unitID)
-        rm:check_individual_unit_on_character(unitID, current_character)
-        rm:enforce_unit_and_grouped_units(unitID, rm:current_character())
-        rm:output_state(current_character) -- will only fire when logging is enabled.
-        core:trigger_event("RecruiterManagerGroupCountUpdated", cm:get_character_by_cqi(rm:current_character():command_queue_index()))
-    end
-end,
-true);
+    end,
+    true);
 
 
---add character battle completed listener
-core:add_listener(
-"RecruiterManagerPlayerCharacterBattled",
-"CharacterCompletedBattle",
-function(context)
-    return context:character():faction():is_human() and rm:has_character(context:character():command_queue_index()) 
-end,
-function(context)
-    rm:log("Player Character Completed Battle!")
-    local character = context:character()
-    --# assume character: CA_CHAR
-    rm:get_character_by_cqi(character:command_queue_index()):set_army_stale()
-    rm:get_character_by_cqi(character:command_queue_index()):set_queue_stale()
-end,
-true)
-
-
-
---add character moved listener
-core:add_listener(
-"RecruiterManagerPlayerCharacterMoved",
-"CharacterFinishedMoving",
-function(context)
-    return context:character():faction():is_human() and rm:has_character(context:character():command_queue_index())
-end,
-function(context)
-    rm:log("Player Character moved!")
-    local character = context:character()
-    --# assume character: CA_CHAR
-    --the character moved, so we're going to set both their army and their queue stale and force the script to re-evaluate them next time they are available.
-    rm:get_character_by_cqi(character:command_queue_index()):set_army_stale()
-    rm:get_character_by_cqi(character:command_queue_index()):set_queue_stale()
-end,
-true)
-
---add unit trained listener
-core:add_listener(
-"RecruiterManagerPlayerFactionRecruitedUnit",
-"UnitTrained",
-function(context)
-    return context:unit():faction():is_human() and rm:has_character(context:unit():force_commander():command_queue_index())
-end,
-function(context)
-    local unit = context:unit()
-    --# assume unit: CA_UNIT
-    local char_cqi = unit:force_commander():command_queue_index();
-    rm:log("Player faction recruited a unit!")
-    local rec_char = rm:get_character_by_cqi(char_cqi)
-    rec_char:set_army_stale()
-    rec_char:clear_mercenary_queue(false)
-    rm:get_character_by_cqi(char_cqi):set_queue_stale()
-end,
-true)
-
---add character selected listener
-core:add_listener(
-    "RecruiterManagerOnCharacterSelected",
-    "CharacterSelected",
+    --add character battle completed listener
+    core:add_listener(
+    "RecruiterManagerPlayerCharacterBattled",
+    "CharacterCompletedBattle",
     function(context)
-    return context:character():faction():is_human() and context:character():has_military_force()
+        return context:character():faction():is_human() and rm:has_character(context:character():command_queue_index()) 
     end,
     function(context)
-        rm:log("Human Character Selected by player!")
+        rm:log("Player Character Completed Battle!")
         local character = context:character()
         --# assume character: CA_CHAR
-        --tell RM which character is selected. This is core to the entire system.
-        local current_character, was_created = rm:set_current_character(character:command_queue_index()) 
-        cm:callback(function()
-            if was_created then
-                rm:check_all_units_on_character(current_character)
-                rm:enforce_all_units_on_current_character()
-            end
-            core:trigger_event("RecruiterManagerGroupCountUpdated", cm:get_character_by_cqi(rm:current_character():command_queue_index()))
-        end, 0.1)
+        rm:get_character_by_cqi(character:command_queue_index()):set_army_stale()
+        rm:get_character_by_cqi(character:command_queue_index()):set_queue_stale()
     end,
     true)
---add recruit panel open listener
-core:add_listener(
-    "RecruiterManagerOnRecruitPanelOpened",
-    "PanelOpenedCampaign",
-    function(context) 
-        local panel = (context.string == "units_recruitment")
-        if rm:current_character() == nil then
-            return false
-        end
-        return panel 
-    end,
-    function(context)
-        local current_character = rm:current_character()
-        cm:callback(function() --do this on a delay so the panel has time to fully open before the script tries to read it!
-            --first, define a holder for our recruit options
-            local rec_opt = {} --:map<string, boolean>
-            --next, get the paths we need to get
-            local pathset = current_character._UIPathSet
-            local paths_to_check = pathset:get_path_list(current_character)
-            for j = 1, #paths_to_check do
-                local recruitmentList = find_uicomponent_from_table(core:get_ui_root(), pathset:get_path(paths_to_check[j]))
-                if not not recruitmentList then
-                    for i = 0, recruitmentList:ChildCount() - 1 do	
-                        local recruitmentOption = UIComponent(recruitmentList:Find(i)):Id();
-                        local unitID = string.gsub(recruitmentOption, "_recruitable", "")
-                        rec_opt[unitID] = true
-                    end
-                end
-            end
-            rm:check_all_ui_recruitment_options(current_character, rec_opt)
-            rm:enforce_units_by_table(rec_opt, current_character)
-            core:trigger_event("RecruiterManagerGroupCountUpdated", cm:get_character_by_cqi(rm:current_character():command_queue_index()))
-            rm:output_state(rm:current_character())
-        end, 0.1)
-    end,
-    true
-)
-
---multiplayer safe listener
-core:add_listener(
-    "UITriggerScriptEventRecruiterManager",
-    "UITriggerScriptEvent",
-    function(context)
-        return context:trigger():starts_with("recruiter_manager|force_stance|")
-    end,
-    function(context)
-        local trigger = context:trigger() --:string
-        local cqi = trigger:gsub("recruiter_manager|force_stance|", "")
-        --# assume cqi: CA_CQI
-        if not (cm:get_character_by_cqi(cqi):military_force():active_stance() == "MILITARY_FORCE_ACTIVE_STANCE_TYPE_SETTLE") then
-            cm:force_character_force_into_stance(cm:char_lookup_str(cqi), "MILITARY_FORCE_ACTIVE_STANCE_TYPE_SETTLE")
-        end
-    end,
-    true
-)
---stance return listener
-
---add mercenary panel open listener
-core:add_listener(
-    "RecruiterManagerOnMercenaryPanelOpened",
-    "PanelOpenedCampaign",
-    function(context) 
-        return context.string == "mercenary_recruitment"; 
-    end,
-    function(context)
-        cm:callback(function() --do this on a delay so the panel has time to fully open before the script tries to read it!
-            --check every unit which has a restriction against the character's lists. This will call refresh on queue and army further upstream when necessary!
-            local recruitmentList = find_uicomponent(core:get_ui_root(), 
-            "units_panel", "main_units_panel", "recruitment_docker", "recruitment_options", "mercenary_display", "listview", "list_clip", "list_box")
-            local current_character = rm:current_character()
-            local record = {} --:map<string, boolean>
-            rm:log("PATH START: Looping through all recruitment options")
-            for i = 0, recruitmentList:ChildCount() - 1 do	
-                local recruitmentOption = UIComponent(recruitmentList:Find(i)):Id();
-                local unitID = string.gsub(recruitmentOption, "_mercenary", "")
-                record = rm:check_individual_unit_on_character(unitID, current_character, record)
-                rm:enforce_ui_restriction_on_unit(rm:get_unit(unitID))
-            end
-            rm:output_state(rm:current_character())
-            core:trigger_event("RecruiterManagerGroupCountUpdated", cm:get_character_by_cqi(rm:current_character():command_queue_index()))
-        end, 0.1)
-    end,
-    true
-)
-
---add listener for mercenary panel closing
-core:add_listener(
-    "RecruiterManagerPanelClosedMercenaries",
-    "PanelClosedCampaign",
-    function(context)
-        return context.string == "mercenary_recruitment"; 
-    end,
-    function(context)
-        rm:current_character():clear_mercenary_queue(false)
-    end,
-    true
-)
 
 
 
---add disbanded listener
-core:add_listener(
-    "RecruiterManagerUnitDisbanded",
-    "UnitDisbanded",
+    --add character moved listener
+    core:add_listener(
+    "RecruiterManagerPlayerCharacterMoved",
+    "CharacterFinishedMoving",
+    function(context)
+        return context:character():faction():is_human() and rm:has_character(context:character():command_queue_index())
+    end,
+    function(context)
+        rm:log("Player Character moved!")
+        local character = context:character()
+        --# assume character: CA_CHAR
+        --the character moved, so we're going to set both their army and their queue stale and force the script to re-evaluate them next time they are available.
+        rm:get_character_by_cqi(character:command_queue_index()):set_army_stale()
+        rm:get_character_by_cqi(character:command_queue_index()):set_queue_stale()
+    end,
+    true)
+
+    --add unit trained listener
+    core:add_listener(
+    "RecruiterManagerPlayerFactionRecruitedUnit",
+    "UnitTrained",
     function(context)
         return context:unit():faction():is_human() and rm:has_character(context:unit():force_commander():command_queue_index())
     end,
     function(context)
-        rm:log("PATH START Human character disbanded a unit!")
         local unit = context:unit()
         --# assume unit: CA_UNIT
-        --remove the unit from the army
-        rm:get_character_by_cqi(unit:force_commander():command_queue_index()):remove_unit_from_army(unit:unit_key())
-        --check the unit (+groups) again.
-        rm:check_individual_unit_on_character(unit:unit_key(), rm:current_character())
-        rm:enforce_all_units_on_current_character()
-        rm:output_state(rm:current_character())
-    end,
-    true);
---add merged listener
-core:add_listener(
-    "RecruiterManagerUnitMerged",
-    "UnitMergedAndDestroyed",
-    function(context)
-        return context:new_unit():faction():is_human() and rm:has_character(context:new_unit():force_commander():command_queue_index())
-    end,
-    function(context)
-        local unit = context:new_unit():unit_key() --:string
-        local cqi = context:new_unit():force_commander():command_queue_index() --:CA_CQI
-        --there is a lot of possibilies when a merge has happened
-        --to be safe, we just set the army stale. 
-        rm:get_character_by_cqi(cqi):set_army_stale()
-        cm:remove_callback("RMMergeDestroy")
-        cm:callback(function()
-            rm:check_all_units_on_character(rm:get_character_by_cqi(cqi))
-            rm:output_state(rm:current_character())
-        end, 0.2, "RMMergeDestroy")
+        local char_cqi = unit:force_commander():command_queue_index();
+        rm:log("Player faction recruited a unit!")
+        local rec_char = rm:get_character_by_cqi(char_cqi)
+        rec_char:set_army_stale()
+        rec_char:clear_mercenary_queue(false)
+        rm:get_character_by_cqi(char_cqi):set_queue_stale()
     end,
     true)
+
+    --add character selected listener
+    core:add_listener(
+        "RecruiterManagerOnCharacterSelected",
+        "CharacterSelected",
+        function(context)
+        return context:character():faction():is_human() and context:character():has_military_force()
+        end,
+        function(context)
+            rm:log("Human Character Selected by player!")
+            local character = context:character()
+            --# assume character: CA_CHAR
+            --tell RM which character is selected. This is core to the entire system.
+            local current_character, was_created = rm:set_current_character(character:command_queue_index()) 
+            cm:callback(function()
+                if was_created then
+                    rm:check_all_units_on_character(current_character)
+                    rm:enforce_all_units_on_current_character()
+                end
+                core:trigger_event("RecruiterManagerGroupCountUpdated", cm:get_character_by_cqi(rm:current_character():command_queue_index()))
+            end, 0.1)
+        end,
+        true)
+    --add recruit panel open listener
+    core:add_listener(
+        "RecruiterManagerOnRecruitPanelOpened",
+        "PanelOpenedCampaign",
+        function(context) 
+            local panel = (context.string == "units_recruitment")
+            if rm:current_character() == nil then
+                return false
+            end
+            return panel 
+        end,
+        function(context)
+            local current_character = rm:current_character()
+            cm:callback(function() --do this on a delay so the panel has time to fully open before the script tries to read it!
+                --first, define a holder for our recruit options
+                local rec_opt = {} --:map<string, boolean>
+                --next, get the paths we need to get
+                local pathset = current_character._UIPathSet
+                local paths_to_check = pathset:get_path_list(current_character)
+                for j = 1, #paths_to_check do
+                    local recruitmentList = find_uicomponent_from_table(core:get_ui_root(), pathset:get_path(paths_to_check[j]))
+                    if not not recruitmentList then
+                        for i = 0, recruitmentList:ChildCount() - 1 do	
+                            local recruitmentOption = UIComponent(recruitmentList:Find(i)):Id();
+                            local unitID = string.gsub(recruitmentOption, "_recruitable", "")
+                            rec_opt[unitID] = true
+                        end
+                    end
+                end
+                rm:check_all_ui_recruitment_options(current_character, rec_opt)
+                rm:enforce_units_by_table(rec_opt, current_character)
+                core:trigger_event("RecruiterManagerGroupCountUpdated", cm:get_character_by_cqi(rm:current_character():command_queue_index()))
+                rm:output_state(rm:current_character())
+            end, 0.1)
+        end,
+        true
+    )
+
+    --multiplayer safe listener
+    core:add_listener(
+        "UITriggerScriptEventRecruiterManager",
+        "UITriggerScriptEvent",
+        function(context)
+            return context:trigger():starts_with("recruiter_manager|force_stance|")
+        end,
+        function(context)
+            local trigger = context:trigger() --:string
+            local cqi = trigger:gsub("recruiter_manager|force_stance|", "")
+            --# assume cqi: CA_CQI
+            if not (cm:get_character_by_cqi(cqi):military_force():active_stance() == "MILITARY_FORCE_ACTIVE_STANCE_TYPE_SETTLE") then
+                cm:force_character_force_into_stance(cm:char_lookup_str(cqi), "MILITARY_FORCE_ACTIVE_STANCE_TYPE_SETTLE")
+            end
+        end,
+        true
+    )
+    --stance return listener
+
+    --add mercenary panel open listener
+    core:add_listener(
+        "RecruiterManagerOnMercenaryPanelOpened",
+        "PanelOpenedCampaign",
+        function(context) 
+            return context.string == "mercenary_recruitment"; 
+        end,
+        function(context)
+            cm:callback(function() --do this on a delay so the panel has time to fully open before the script tries to read it!
+                --check every unit which has a restriction against the character's lists. This will call refresh on queue and army further upstream when necessary!
+                local recruitmentList = find_uicomponent(core:get_ui_root(), 
+                "units_panel", "main_units_panel", "recruitment_docker", "recruitment_options", "mercenary_display", "listview", "list_clip", "list_box")
+                local current_character = rm:current_character()
+                local record = {} --:map<string, boolean>
+                rm:log("PATH START: Looping through all recruitment options")
+                for i = 0, recruitmentList:ChildCount() - 1 do	
+                    local recruitmentOption = UIComponent(recruitmentList:Find(i)):Id();
+                    local unitID = string.gsub(recruitmentOption, "_mercenary", "")
+                    record = rm:check_individual_unit_on_character(unitID, current_character, record)
+                    rm:enforce_ui_restriction_on_unit(rm:get_unit(unitID))
+                end
+                rm:output_state(rm:current_character())
+                core:trigger_event("RecruiterManagerGroupCountUpdated", cm:get_character_by_cqi(rm:current_character():command_queue_index()))
+            end, 0.1)
+        end,
+        true
+    )
+
+    --add listener for mercenary panel closing
+    core:add_listener(
+        "RecruiterManagerPanelClosedMercenaries",
+        "PanelClosedCampaign",
+        function(context)
+            return context.string == "mercenary_recruitment"; 
+        end,
+        function(context)
+            rm:current_character():clear_mercenary_queue(false)
+        end,
+        true
+    )
+
+
+
+    --add disbanded listener
+    core:add_listener(
+        "RecruiterManagerUnitDisbanded",
+        "UnitDisbanded",
+        function(context)
+            return context:unit():faction():is_human() and rm:has_character(context:unit():force_commander():command_queue_index())
+        end,
+        function(context)
+            rm:log("PATH START Human character disbanded a unit!")
+            local unit = context:unit()
+            --# assume unit: CA_UNIT
+            --remove the unit from the army
+            rm:get_character_by_cqi(unit:force_commander():command_queue_index()):remove_unit_from_army(unit:unit_key())
+            --check the unit (+groups) again.
+            rm:check_individual_unit_on_character(unit:unit_key(), rm:current_character())
+            rm:enforce_all_units_on_current_character()
+            rm:output_state(rm:current_character())
+        end,
+        true);
+    --add merged listener
+    core:add_listener(
+        "RecruiterManagerUnitMerged",
+        "UnitMergedAndDestroyed",
+        function(context)
+            return context:new_unit():faction():is_human() and rm:has_character(context:new_unit():force_commander():command_queue_index())
+        end,
+        function(context)
+            local unit = context:new_unit():unit_key() --:string
+            local cqi = context:new_unit():force_commander():command_queue_index() --:CA_CQI
+            --there is a lot of possibilies when a merge has happened
+            --to be safe, we just set the army stale. 
+            rm:get_character_by_cqi(cqi):set_army_stale()
+            cm:remove_callback("RMMergeDestroy")
+            cm:callback(function()
+                rm:check_all_units_on_character(rm:get_character_by_cqi(cqi))
+                rm:output_state(rm:current_character())
+            end, 0.2, "RMMergeDestroy")
+        end,
+        true)
+end)
 
 -------------
 --transfers--
@@ -514,41 +514,18 @@ end
 
 
 
-
-core:add_listener(
-    "RecruiterManagerOnExchangePanelOpened",
-    "PanelOpenedCampaign",
-    function(context) 
-        return context.string == "unit_exchange"; 
-    end,
-    function(context)
-        cm:callback(function() --do this on a delay so the panel has time to fully open before the script tries to read it!
-            -- print_all_uicomponent_children(find_uicomponent(core:get_ui_root(), "unit_exchange"))
-            RM_TRANSFERS.first = rm._UICurrentCharacter
-            RM_TRANSFERS.second = find_second_army()
-            local first_army, second_army = count_armies()
-            local valid_armies, reason = are_armies_valid(first_army, second_army)
-            if valid_armies then
-                UnlockExchangeButton()
-            else
-                rm:log("locking exchange button for reason ["..reason.."] ")
-                LockExchangeButton(reason)
-            end
-        end, 0.1)
-    end,
-    true
-)
-
-core:add_listener(
-    "RecruiterManagerOnExchangeOptionClicked",
-    "ComponentLClickUp",
-    function(context)
-        return not not string.find(context.string, "UnitCard") 
-    end,
-    function(context)
-        cm:remove_callback("RMTransferReval")
-        cm:callback(function()
-                rm:log("refreshing army validity")
+cm:add_first_tick_callback(function()
+    core:add_listener(
+        "RecruiterManagerOnExchangePanelOpened",
+        "PanelOpenedCampaign",
+        function(context) 
+            return context.string == "unit_exchange"; 
+        end,
+        function(context)
+            cm:callback(function() --do this on a delay so the panel has time to fully open before the script tries to read it!
+                -- print_all_uicomponent_children(find_uicomponent(core:get_ui_root(), "unit_exchange"))
+                RM_TRANSFERS.first = rm._UICurrentCharacter
+                RM_TRANSFERS.second = find_second_army()
                 local first_army, second_army = count_armies()
                 local valid_armies, reason = are_armies_valid(first_army, second_army)
                 if valid_armies then
@@ -557,25 +534,49 @@ core:add_listener(
                     rm:log("locking exchange button for reason ["..reason.."] ")
                     LockExchangeButton(reason)
                 end
-        end, 0.1, "RMTransferReval")
-    
-    end,
-    true);
+            end, 0.1)
+        end,
+        true
+    )
+
+    core:add_listener(
+        "RecruiterManagerOnExchangeOptionClicked",
+        "ComponentLClickUp",
+        function(context)
+            return not not string.find(context.string, "UnitCard") 
+        end,
+        function(context)
+            cm:remove_callback("RMTransferReval")
+            cm:callback(function()
+                    rm:log("refreshing army validity")
+                    local first_army, second_army = count_armies()
+                    local valid_armies, reason = are_armies_valid(first_army, second_army)
+                    if valid_armies then
+                        UnlockExchangeButton()
+                    else
+                        rm:log("locking exchange button for reason ["..reason.."] ")
+                        LockExchangeButton(reason)
+                    end
+            end, 0.1, "RMTransferReval")
+        
+        end,
+        true);
 
 
-core:add_listener(
-    "RecruiterManagerOnExchangePanelClosed",
-    "PanelClosedCampaign",
-    function(context)
-        return context.string == "unit_exchange"
-    end,
-    function(context)
-        rm:log("Exchange panel closed, setting armies stale!")
-        for _, cqi in pairs(RM_TRANSFERS) do
-            rm:get_character_by_cqi(cqi):set_army_stale()
-            core:trigger_event("RecruiterManagerGroupCountUpdated", cm:get_character_by_cqi(rm:current_character():command_queue_index()))
-        end
-    end,
-    true
-)
+    core:add_listener(
+        "RecruiterManagerOnExchangePanelClosed",
+        "PanelClosedCampaign",
+        function(context)
+            return context.string == "unit_exchange"
+        end,
+        function(context)
+            rm:log("Exchange panel closed, setting armies stale!")
+            for _, cqi in pairs(RM_TRANSFERS) do
+                rm:get_character_by_cqi(cqi):set_army_stale()
+                core:trigger_event("RecruiterManagerGroupCountUpdated", cm:get_character_by_cqi(rm:current_character():command_queue_index()))
+            end
+        end,
+        true
+    )
 
+end)

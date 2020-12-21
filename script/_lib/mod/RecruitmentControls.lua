@@ -17,7 +17,7 @@ Enforcement
 --checks the unit keys 
 --]]
 if __game_mode ~= __lib_type_campaign then
-	return
+	--return
 end
 
 --Log script to text
@@ -351,7 +351,7 @@ end
 ------------------------------
 ------------------------------
 --TODO immport
-cm:load_global_script("rm_api/recruiter_pathset")
+cm:load_global_script("recruiter_pathset")
 --# assume recruiter_pathset.new_path: function(paths: map<string, vector<string>>, merc_path: vector<string>, conditional_tests: (function(rec_char: RECRUITER_CHARACTER) --> vector<string>)?) --> RECRUITER_PATHSET
 --------------------------
 ----SUBOBJECT HANDLERS----
@@ -373,7 +373,7 @@ end
 ----RECRUITER CHARACTER----
 ---------------------------
 --TODO import
-cm:load_global_script("rm_api/recruiter_character")
+cm:load_global_script("recruiter_character")
 --# assume recruiter_character.new: function(manager: RECRUITER_MANAGER, cqi: CA_CQI) --> RECRUITER_CHARACTER
 
 --------------------------
@@ -453,7 +453,7 @@ end
 ----RECRUITER UNITS----
 -----------------------
 --TODO import
-cm:load_global_script("rm_api/recruiter_unit")
+cm:load_global_script("recruiter_unit")
 --# assume recruiter_unit.create_record: function( manager: RECRUITER_MANAGER, main_unit_key: string, base_unit: RECRUITER_UNIT?) --> RECRUITER_UNIT
 --------------------------
 ----SUBOBJECT HANDLERS----
@@ -675,7 +675,9 @@ function recruiter_manager.check_individual_unit_on_character(self, unitID,rec_c
             --wait! We need to make sure this unit is actually in this group for this specific character!
             --otherwise we'll fuck up the other groups' restrictions!
             if grouped_unit:has_group(groupID) then
-                local should_restrict = rec_char:get_group_counts_on_character(groupID) + grouped_unit:weight() > restriction_quantity
+                local group_count = rec_char:get_group_counts_on_character(groupID)
+                local weight = grouped_unit:weight()
+                local should_restrict = group_count + weight > restriction_quantity
                 if should_restrict then
                     did_restrict = true
                 end
@@ -684,7 +686,7 @@ function recruiter_manager.check_individual_unit_on_character(self, unitID,rec_c
                     --If we have already restricted, and this is false, then we don't want to cancel that valid restriction.
                     rec_char:set_unit_restriction(grouped_unit:key(),
                         should_restrict,
-                        "This character already has the maximum number of "..self:get_ui_name_for_group(groupID)..". ("..restriction_quantity..")"
+                        "This unit costs "..weight.." "..self:get_ui_name_for_group(groupID).." points, but this army only has "..tostring(restriction_quantity - group_count).." available."
                     )
                 end
             end
@@ -734,7 +736,9 @@ function recruiter_manager.check_all_ui_recruitment_options(self, rec_char, ui_o
             --wait! We need to make sure this unit is actually in this group for this specific character!
             --otherwise we'll fuck up the other groups' restrictions!
             if grouped_unit:has_group(groupID) then
-                local should_restrict = rec_char:get_group_counts_on_character(groupID) + grouped_unit:weight() > restriction_quantity
+                local group_count = rec_char:get_group_counts_on_character(groupID)
+                local weight = grouped_unit:weight()
+                local should_restrict = group_count + weight > restriction_quantity
                 if should_restrict then
                     did_restrict = true
                 end
@@ -743,7 +747,7 @@ function recruiter_manager.check_all_ui_recruitment_options(self, rec_char, ui_o
                     --If we have already restricted, and this is false, then we don't want to cancel that valid restriction.
                     rec_char:set_unit_restriction(grouped_unit:key(),
                         should_restrict,
-                        "This character already has the maximum number of "..self:get_ui_name_for_group(groupID)..". ("..restriction_quantity..")"
+                        "This unit costs "..weight.." "..self:get_ui_name_for_group(groupID).." points, but this army only has "..tostring(restriction_quantity - group_count).." available."
                     )
                 end
             end
@@ -792,7 +796,7 @@ function recruiter_manager.remove_unit_from_character_queue_and_refresh_limits(s
         local did_restrict = false --:boolean
         for groupID, _ in pairs(rec_unit:groups()) do
             local current_count = rec_char:get_group_counts_on_character(groupID)
-            local new_count = current_count+rec_unit:weight()
+            local new_count = current_count - rec_unit:weight()
             if new_count < 0 then
                 -- I don't really know what causes these to go negative but --TODO figure this out. 
                 rec_char:set_queue_stale()
@@ -804,14 +808,17 @@ function recruiter_manager.remove_unit_from_character_queue_and_refresh_limits(s
             for i = 1, #grouped_units do
                 local grouped_unit = self:get_unit(grouped_units[i], rec_char)
                 if grouped_unit:has_group(groupID) then
-                    local should_restrict = rec_char:get_group_counts_on_character(groupID) + grouped_unit:weight() > restriction_quantity
-                    if should_restrict then
+                    local weight = grouped_unit:weight()
+                    local should_restrict = new_count + weight > restriction_quantity
+                    local was_restricted = current_count + weight > restriction_quantity
+                    if should_restrict and grouped_unit:key() == unitID then
                         did_restrict = true
                     end
-                    if should_restrict or (not did_restrict) then
+                    if should_restrict or ((was_restricted and (not should_restrict)) 
+                    and grouped_unit:key() == unitID and (not did_restrict)) then
                         rec_char:set_unit_restriction(grouped_unit:key(),
                             should_restrict,
-                            "This character already has the maximum number of "..self:get_ui_name_for_group(groupID)..". ("..restriction_quantity..")"
+                            "This unit costs "..weight.." "..self:get_ui_name_for_group(groupID).." points, but this army only has "..tostring(restriction_quantity - new_count).." available."
                         )
                     end
                 end
@@ -837,14 +844,15 @@ function recruiter_manager.add_unit_to_character_queue_and_refresh_limits(self, 
         for i = 1, #grouped_units do
             local grouped_unit = self:get_unit(grouped_units[i], rec_char)
             if grouped_unit:has_group(groupID) then
-                local should_restrict = rec_char:get_group_counts_on_character(groupID) + grouped_unit:weight() > restriction_quantity
+                local weight = grouped_unit:weight()
+                local should_restrict = new_count + weight > restriction_quantity
                 if should_restrict then
                     did_restrict = true
                 end
                 if should_restrict or (not did_restrict) then
                     rec_char:set_unit_restriction(grouped_unit:key(),
                         should_restrict,
-                        "This character already has the maximum number of "..self:get_ui_name_for_group(groupID)..". ("..restriction_quantity..")"
+                        "This unit costs "..weight.." "..self:get_ui_name_for_group(groupID).." points, but this army only has "..tostring(restriction_quantity - new_count).." available."
                     )
                 end
             end
@@ -903,7 +911,7 @@ function recruiter_manager.enforce_ui_restriction_on_unit(self, rec_unit)
                     if not not lockedOverlay then
                         lockedOverlay:SetVisible(true)
                         lockedOverlay:SetImagePath("ui/custom/recruitment_controls/locked_unit.png")
-                        lockedOverlay:SetTooltipText(rec_char:get_unit_lock_string(unitID))
+                        lockedOverlay:SetTooltipText(rec_char:get_unit_lock_string(unitID), true)
                         lockedOverlay:SetCanResizeHeight(true)
                         lockedOverlay:SetCanResizeWidth(true)
                         lockedOverlay:Resize(72, 89)
@@ -920,7 +928,7 @@ function recruiter_manager.enforce_ui_restriction_on_unit(self, rec_unit)
                     if not not lockedOverlay then
                         if rec_unit._UIPip then
                             lockedOverlay:SetVisible(true)
-                            lockedOverlay:SetTooltipText(rec_unit._UIText)
+                            lockedOverlay:SetTooltipText(rec_unit._UIText, true)
                             lockedOverlay:SetImagePath(rec_unit._UIPip)
                             lockedOverlay:SetCanResizeHeight(true)
                             lockedOverlay:SetCanResizeWidth(true)
@@ -970,7 +978,7 @@ function recruiter_manager.enforce_ui_restriction_on_unit(self, rec_unit)
                         if not not lockedOverlay then
                             lockedOverlay:SetVisible(true)
                             lockedOverlay:SetImagePath("ui/custom/recruitment_controls/locked_unit.png")
-                            lockedOverlay:SetTooltipText(rec_char:get_unit_lock_string(unitID))
+                            lockedOverlay:SetTooltipText(rec_char:get_unit_lock_string(unitID), true)
                             lockedOverlay:SetCanResizeHeight(true)
                             lockedOverlay:SetCanResizeWidth(true)
                             lockedOverlay:Resize(72, 89)
@@ -987,7 +995,7 @@ function recruiter_manager.enforce_ui_restriction_on_unit(self, rec_unit)
                         if not not lockedOverlay then
                             if rec_unit._UIPip then
                                 lockedOverlay:SetVisible(true)
-                                lockedOverlay:SetTooltipText(rec_unit._UIText)
+                                lockedOverlay:SetTooltipText(rec_unit._UIText, true)
                                 lockedOverlay:SetImagePath(rec_unit._UIPip)
                                 lockedOverlay:SetCanResizeHeight(true)
                                 lockedOverlay:SetCanResizeWidth(true)
