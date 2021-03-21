@@ -192,6 +192,19 @@ if __write_output_to_logfile then
     error_check()
 end
 
+--v function(loc: string, ...: string) --> string
+local function fill_loc(loc, ...)
+    local output = loc
+    for i = 1, arg.n do
+        local f = i - 1
+        local gsub_text = f..f..f..f
+        output = string.gsub(output, gsub_text, arg[i])
+    end
+    return output
+end
+
+
+
 
 local recruiter_manager = {} --# assume recruiter_manager: RECRUITER_MANAGER
 
@@ -215,6 +228,8 @@ function recruiter_manager.init()
     self._overrideUnits = {} --:map<string, RECRUITER_UNIT>
     --stores subtypes who get specific overriden unit records added to them at creation
     self._overrideSubtypeFilters = {} --:map<string, vector<string>>
+    --stores subcultures who get specific overriden unit records added to them at creation, used for loaned units.
+    self._overrideSubcultureFilters = {} --:map<string, vector<string>>
     --stores skills which add a specific overriden unit record to a character
     self._overrideSkillRequirements = {} --:map<string, map<string, string>>
     --same for traits
@@ -246,9 +261,13 @@ function recruiter_manager.init()
 
     --stores default acceptible units for the AI to use
     self._AIDefaultUnits = {} --:map<string, vector<string>>
+
+
     --flags whether to enforce AI functionality
     self._AIEnforce = true --:boolean
-
+    --stores settings for the points limits
+    self._specialPointLimit = 10 --:int
+    self._rarePointLimit = 5 --:int
     _G.rm = self
 end
 
@@ -637,6 +656,9 @@ end
 
 --v function(self: RECRUITER_MANAGER, unitID: string, rec_char: RECRUITER_CHARACTER, process_record: map<string, boolean>?) --> map<string, boolean>
 function recruiter_manager.check_individual_unit_on_character(self, unitID,rec_char, process_record)
+    --localisations
+    local loc_points = effect.get_localised_string("ttc_measurement_name")
+    local loc_restriction = effect.get_localised_string("ttc_restriction_tooltip")
     if not process_record then
         process_record = {}
     end
@@ -684,9 +706,10 @@ function recruiter_manager.check_individual_unit_on_character(self, unitID,rec_c
                 if should_restrict or (not did_restrict) then
                     --if we should restrict, add a reason. 
                     --If we have already restricted, and this is false, then we don't want to cancel that valid restriction.
+                    local restriction_text = fill_loc(loc_restriction, tostring(weight), self:get_ui_name_for_group(groupID), loc_points, tostring(restriction_quantity - group_count), loc_points)
                     rec_char:set_unit_restriction(grouped_unit:key(),
                         should_restrict,
-                        "This unit costs "..weight.." "..self:get_ui_name_for_group(groupID).." points, but this army only has "..tostring(restriction_quantity - group_count).." available."
+                        restriction_text
                     )
                 end
             end
@@ -700,6 +723,9 @@ function recruiter_manager.check_all_ui_recruitment_options(self, rec_char, ui_o
     if not process_record then
         process_record = {}
     end
+    --localisations
+    local loc_points = effect.get_localised_string("ttc_measurement_name")
+    local loc_restriction = effect.get_localised_string("ttc_restriction_tooltip")
     --# assume process_record: map<string, boolean>
     for unitID, _ in pairs(ui_option_table) do
         --first, get the unit
@@ -745,9 +771,10 @@ function recruiter_manager.check_all_ui_recruitment_options(self, rec_char, ui_o
                 if should_restrict or (not did_restrict) then
                     --if we should restrict, add a reason. 
                     --If we have already restricted, and this is false, then we don't want to cancel that valid restriction.
+                    local restriction_text = fill_loc(loc_restriction, tostring(weight), self:get_ui_name_for_group(groupID), loc_points, tostring(restriction_quantity - group_count), loc_points)
                     rec_char:set_unit_restriction(grouped_unit:key(),
                         should_restrict,
-                        "This unit costs "..weight.." "..self:get_ui_name_for_group(groupID).." points, but this army only has "..tostring(restriction_quantity - group_count).." available."
+                        restriction_text
                     )
                 end
             end
@@ -788,6 +815,9 @@ end
 
 --v function(self: RECRUITER_MANAGER, unitID: string, rec_char: RECRUITER_CHARACTER, is_mercenary: boolean?)
 function recruiter_manager.remove_unit_from_character_queue_and_refresh_limits(self, unitID, rec_char, is_mercenary)
+    --localisations
+    local loc_points = effect.get_localised_string("ttc_measurement_name")
+    local loc_restriction = effect.get_localised_string("ttc_restriction_tooltip")
     --get the real unit record
     local rec_unit = self:get_unit(unitID, rec_char)
     --reduce the count of the queue for that unit!
@@ -816,9 +846,10 @@ function recruiter_manager.remove_unit_from_character_queue_and_refresh_limits(s
                     end
                     if should_restrict or ((was_restricted and (not should_restrict)) 
                     and grouped_unit:key() == unitID and (not did_restrict)) then
+                        local restriction_text = fill_loc(loc_restriction, tostring(weight), self:get_ui_name_for_group(groupID), loc_points, tostring(restriction_quantity - new_count), loc_points)
                         rec_char:set_unit_restriction(grouped_unit:key(),
                             should_restrict,
-                            "This unit costs "..weight.." "..self:get_ui_name_for_group(groupID).." points, but this army only has "..tostring(restriction_quantity - new_count).." available."
+                            restriction_text
                         )
                     end
                 end
@@ -829,6 +860,9 @@ end
 
 --v function(self: RECRUITER_MANAGER, unitID: string, rec_char: RECRUITER_CHARACTER, is_mercenary: boolean?)
 function recruiter_manager.add_unit_to_character_queue_and_refresh_limits(self, unitID, rec_char, is_mercenary)
+    --localisations
+    local loc_points = effect.get_localised_string("ttc_measurement_name")
+    local loc_restriction = effect.get_localised_string("ttc_restriction_tooltip")
     local rec_unit = self:get_unit(unitID, rec_char) 
     if is_mercenary then
         rec_char:queue_mercenary(unitID)
@@ -850,9 +884,10 @@ function recruiter_manager.add_unit_to_character_queue_and_refresh_limits(self, 
                     did_restrict = true
                 end
                 if should_restrict or (not did_restrict) then
+                    local restriction_text = fill_loc(loc_restriction, tostring(weight), self:get_ui_name_for_group(groupID), loc_points, tostring(restriction_quantity - new_count), loc_points)
                     rec_char:set_unit_restriction(grouped_unit:key(),
                         should_restrict,
-                        "This unit costs "..weight.." "..self:get_ui_name_for_group(groupID).." points, but this army only has "..tostring(restriction_quantity - new_count).." available."
+                        restriction_text
                     )
                 end
             end
@@ -1129,6 +1164,7 @@ end--]]
 
 
 
+
 --set the UI profile for a unit.
 --# type global RM_UIPROFILE = {_text: string, _image: string}
 --v function(self: RECRUITER_MANAGER, unitID: string, UIprofile: RM_UIPROFILE)
@@ -1188,7 +1224,105 @@ function recruiter_manager.evaluate_path_set_for_character(self, character)
     return nil
 end
 
+--------------------------
+-------LOANED UNITS-------
+--------------------------
+--v function(self: RECRUITER_MANAGER, loaned_units_table: vector<{string, string, string, number?}>)
+function recruiter_manager.add_loaned_units_in_table(self, loaned_units_table)
+    --localisations
+    local loc_core = effect.get_localised_string("ttc_group_name_core")
+    local loc_special = effect.get_localised_string("ttc_group_name_special")
+    local loc_rare = effect.get_localised_string("ttc_group_name_rare")
+    local loc_points = effect.get_localised_string("ttc_measurement_name")
+    local loc_limit = effect.get_localised_string("ttc_army_limited")
+    local loc_unlimited = effect.get_localised_string("ttc_army_unlimited")
+    local loc_unit_cost = effect.get_localised_string("ttc_unit_cost")
+    local loc_unit_no_cost = effect.get_localised_string("ttc_unit_no_cost")
+    for i = 1, #loaned_units_table do
+        local current_entry = loaned_units_table[i]
+        local weight = current_entry[4] or 1
+        local override_name = current_entry[1].."_"..current_entry[3]
+        local override_unit = self:create_unit_override(current_entry[1], override_name, current_entry[3], current_entry[4])
+        if string.find(loaned_units_table[i][3], "core") then
+            local textstring = fill_loc(loc_unit_no_cost, loc_core) .. " \n" ..fill_loc(loc_unlimited, loc_core)
+            self:set_ui_profile_for_unit_override(override_name, 
+                textstring,
+                "ui/custom/recruitment_controls/common_units.png"
+            )
+        elseif string.find(loaned_units_table[i][3], "special") then
+            local textstring = fill_loc(loc_unit_cost, loc_special) .. "[[col:green]] "..weight.." [[/col]]"..loc_points..". \n"..fill_loc(loc_limit, tostring(self._specialPointLimit), loc_points, loc_special) 
+            self:set_ui_profile_for_unit_override(override_name, 
+                textstring,
+                "ui/custom/recruitment_controls/special_units_"..weight..".png"
+            )
+        elseif string.find(loaned_units_table[i][3], "rare") then
+            local textstring = fill_loc(loc_unit_cost, loc_rare) .. "[[col:green]] "..weight.." [[/col]]"..loc_points..". \n"..fill_loc(loc_limit, tostring(self._rarePointLimit), loc_points, loc_rare) 
+            self:set_ui_profile_for_unit_override(override_name, 
+                textstring,
+                "ui/custom/recruitment_controls/rare_units_"..weight..".png"
+            )
+        end
+        if not self._overrideSubcultureFilters[current_entry[2]] then
+            self._overrideSubcultureFilters[current_entry[2]] = {}
+        end
+        table.insert(self._overrideSubcultureFilters[current_entry[2]], override_unit)
+    end
+end
 
+--------------------------
+-----MASS GROUPING API----
+--------------------------
+
+--v function(self: RECRUITER_MANAGER, groups_table: vector<{string, string, number?}>, unit_text_overrides: map<string, RM_UIPROFILE>?) --> map<string, boolean>
+function recruiter_manager.add_units_in_table_to_tabletop_groups(self, groups_table, unit_text_overrides)
+    local groups = {} --:map<string, boolean>
+    --localisations
+    local loc_core = effect.get_localised_string("ttc_group_name_core")
+    local loc_special = effect.get_localised_string("ttc_group_name_special")
+    local loc_rare = effect.get_localised_string("ttc_group_name_rare")
+    local loc_points = effect.get_localised_string("ttc_measurement_name")
+    local loc_limit = effect.get_localised_string("ttc_army_limited")
+    local loc_unlimited = effect.get_localised_string("ttc_army_unlimited")
+    local loc_unit_cost = effect.get_localised_string("ttc_unit_cost")
+    local loc_unit_no_cost = effect.get_localised_string("ttc_unit_no_cost")
+
+    for i = 1, #groups_table do
+        if not unit_text_overrides then
+            unit_text_overrides = {}
+        end
+        --# assume unit_text_overrides: map<string, RM_UIPROFILE>
+        if groups_table[i][3] then
+            self:set_weight_for_unit(groups_table[i][1], groups_table[i][3])
+        end
+        groups[groups_table[i][2]] = true;
+        self:add_unit_to_group(groups_table[i][1], groups_table[i][2])
+        local override = unit_text_overrides[groups_table[i][1]]
+        if override then
+            self:set_ui_profile_for_unit(groups_table[i][1], override)
+        elseif string.find(groups_table[i][2], "core") then
+            local textstring = fill_loc(loc_unit_no_cost, loc_core) .. " \n" ..fill_loc(loc_unlimited, loc_core)
+            self:set_ui_profile_for_unit(groups_table[i][1], {
+                _text = textstring,
+                _image = "ui/custom/recruitment_controls/common_units.png"
+            })
+        elseif string.find(groups_table[i][2], "special") then
+            local weight = groups_table[i][3] --# assume weight: number
+            local textstring = fill_loc(loc_unit_cost, loc_special) .. "[[col:green]] "..weight.." [[/col]]"..loc_points..". \n"..fill_loc(loc_limit, tostring(self._specialPointLimit), loc_points, loc_special) 
+            self:set_ui_profile_for_unit(groups_table[i][1], {
+                _text = textstring,
+                _image = "ui/custom/recruitment_controls/special_units_"..weight..".png"
+            })
+        elseif string.find(groups_table[i][2], "rare") then
+            local weight = groups_table[i][3] --# assume weight: number
+            local textstring = fill_loc(loc_unit_cost, loc_rare) .. "[[col:green]] "..weight.." [[/col]]"..loc_points..". \n"..fill_loc(loc_limit, tostring(self._rarePointLimit), loc_points, loc_rare) 
+            self:set_ui_profile_for_unit(groups_table[i][1], {
+                _text = textstring,
+                _image = "ui/custom/recruitment_controls/rare_units_"..weight..".png"
+            })
+        end
+    end
+    return groups
+end
 
 --------------------------
 ----AI CAP REPLICATION----
@@ -1309,7 +1443,39 @@ function recruiter_manager.register_subtype_as_char_bound_horde(self, subtype)
     self:add_subtype_path_filter(subtype, "CharBoundHordeWithGlobal")
 end
 
+--v [NO_CHECK] function()
+local function init_mct()
+    local mct = core:get_static_object("mod_configuration_tool")
+    if mct then
+        core:add_listener(
+            "obr_MctInitialized",
+            "MctInitialized",
+            true,
+            function(context)
+                local ttc_mod = mct:get_mod_by_key("ttc")
+                local enable_rm = ttc_mod:get_option_by_key("a_enable")
+                enable_rm:set_read_only(true)
+                if enable_rm:get_finalized_setting() == true then
+                    local rm = _G.rm
+                    local special_points = ttc_mod:get_option_by_key("b_special_points")
+                    rm._specialPointLimit = special_points:get_finalized_setting()
+                    special_points:set_read_only(true)
+                    local rare_points = ttc_mod:get_option_by_key("b_rare_points")
+                    rm._rarePointLimit = rare_points:get_finalized_setting()
+                    rare_points:set_read_only(true)
+                    local enforce_for_ai = ttc_mod:get_option_by_key("c_ai")
+                    rm:enforce_ai_restrictions(enforce_for_ai:get_finalized_setting())
+                    enforce_for_ai:set_read_only(true)
+                end
+            end,
+            true)
+    end
+end
 
 --institation 
-recruiter_manager.init()
+if __game_mode == __lib_type_campaign then
+    recruiter_manager.init()
+    init_mct()
+end
+
 

@@ -151,6 +151,16 @@ core:add_listener(
     end,
     function(context)
         local char = context:character() --:CA_CHAR
+        local subculture = char:faction():subculture()
+        if rm._overrideSubcultureFilters[subculture] then
+            for i = 1, #rm._overrideSubtypeFilters[subculture] do
+                local abstractionID = rm._overrideSubtypeFilters[subculture][i]
+                local abstraction = rm._overrideUnits[abstractionID]
+                if abstraction then
+                    rm:get_character_by_cqi(char:command_queue_index()):add_overriden_unit_entry(abstraction:key(), abstraction)
+                end
+            end
+        end
         local subtype = char:character_subtype_key()
         if rm._overrideSubtypeFilters[subtype] then
             for i = 1, #rm._overrideSubtypeFilters[subtype] do
