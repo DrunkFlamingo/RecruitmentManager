@@ -951,82 +951,41 @@ local unit_text_overrides = {
     }
 }--:map<string, RM_UIPROFILE>
 
+local loaned_units = {
+    {"wh2_main_lzd_cav_cold_ones_feral_0", "wh2_main_sc_def_dark_elves", "def_core"},
+    {"wh2_main_lzd_mon_stegadon_0", "wh2_main_sc_def_dark_elves", "def_special", 3},
+    {"wh2_main_lzd_mon_carnosaur_0", "wh2_main_sc_def_dark_elves", "def_rare", 2}
+}--:vector<{string, string, string, number?}>
 
-local groups = {} --:map<string, boolean>
-local pools = {} --:map<string, vector<string>>
+---info tables end---
 
-local prefix_to_subculture = {
-    bst = "wh_dlc03_sc_bst_beastmen",
-    wef = "wh_dlc05_sc_wef_wood_elves",
-    brt = "wh_main_sc_brt_bretonnia",
-    chs = "wh_main_sc_chs_chaos",
-    dwf = "wh_main_sc_dwf_dwarfs",
-    emp = "wh_main_sc_emp_empire",
-    grn = "wh_main_sc_grn_greenskins",
-    ksl = "wh_main_sc_ksl_kislev",
-    nor = "wh_main_sc_nor_norsca",
-    teb = "wh_main_sc_teb_teb",
-    vmp = "wh_main_sc_vmp_vampire_counts",
-    tmb = "wh2_dlc09_sc_tmb_tomb_kings",
-    def = "wh2_main_sc_def_dark_elves",
-    hef = "wh2_main_sc_hef_high_elves",
-    lzd = "wh2_main_sc_lzd_lizardmen",
-    skv = "wh2_main_sc_skv_skaven",
-    cst = "wh2_dlc11_sc_cst_vampire_coast"
-}--:map<string, string>
+--adds units to the mod
+local groups = rm:add_units_in_table_to_tabletop_groups(units, unit_text_overrides)
+rm:add_loaned_units_in_table(loaned_units)
 
-
-for i = 1, #units do
-    if units[i][3] then
-        rm:set_weight_for_unit(units[i][1], units[i][3])
-    end
-    groups[units[i][2]] = true;
-    rm:add_unit_to_group(units[i][1], units[i][2])
-    local override = unit_text_overrides[units[i][1]]
-    if override then
-        rm:set_ui_profile_for_unit(units[i][1], override)
-    elseif string.find(units[i][2], "_core") then
-        local prefix = string.gsub(units[i][2], "_core", "")
-        rm:set_ui_profile_for_unit(units[i][1], {
-            _text = "This unit is a Core Unit. \n Armies may have an unlimited number of Core Units.",
-            _image = "ui/custom/recruitment_controls/common_units.png"
-        })
-    elseif string.find(units[i][2], "_special") then
-        local prefix = string.gsub(units[i][2], "_special", "")
-        local weight = units[i][3] --# assume weight: number
-        rm:set_ui_profile_for_unit(units[i][1], {
-            _text = "This unit is a Special Unit and costs[[col:green]] "..weight.." [[/col]]points. \n Armies may have up to 10 Points worth of Special Units. ",
-            _image = "ui/custom/recruitment_controls/special_units_"..weight..".png"
-        })
-    elseif string.find(units[i][2], "_rare") then
-        local prefix = string.gsub(units[i][2], "_rare", "")
-        local weight = units[i][3] --# assume weight: number
-        rm:set_ui_profile_for_unit(units[i][1], {
-            _text = "This unit is a Rare Unit and costs[[col:green]] "..weight.." [[/col]]points. \n Armies may have up to 5 Points worth of Rare Units. ",
-            _image = "ui/custom/recruitment_controls/rare_units_"..weight..".png"
-        })
-    end
-end
-
-
-
-
+--sets up limits and other things at first tick.
 cm.first_tick_callbacks[#cm.first_tick_callbacks+1] = function(context) 
 
+    local loc_core = effect.get_localised_string("ttc_group_name_core")
+    local loc_special = effect.get_localised_string("ttc_group_name_special")
+    local loc_rare = effect.get_localised_string("ttc_group_name_rare")
+    --this sets the names and quantitiy limits of each group.
     for name, _ in pairs(groups) do
         if string.find(name, "core") then
-            rm:set_ui_name_for_group(name, "Core Units")
+            rm:set_ui_name_for_group(name, loc_core)
             --rm:add_character_quantity_limit_for_group(name, 21)
         end
         if string.find(name, "special") then
-            rm:set_ui_name_for_group(name, "Special Units")
-            rm:add_character_quantity_limit_for_group(name, 10)
+            rm:set_ui_name_for_group(name, loc_special)
+            rm:add_character_quantity_limit_for_group(name, rm._specialPointLimit)
         end
         if string.find(name, "rare") then
-            rm:set_ui_name_for_group(name, "Rare Units")
-            rm:add_character_quantity_limit_for_group(name, 5)
+            rm:set_ui_name_for_group(name, loc_rare)
+            rm:add_character_quantity_limit_for_group(name, rm._rarePointLimit)
         end
     end
+            
+        
     --this gives skrolk core plague monks
     rm:create_unit_override("wh2_main_skv_inf_plague_monks", "core_plague_monks")
     rm:add_subtype_filter_for_unit_override("wh2_main_skv_lord_skrolk", "core_plague_monks")
@@ -1057,4 +1016,85 @@ cm.first_tick_callbacks[#cm.first_tick_callbacks+1] = function(context)
     end
 end;
 
+--adds new units to Drunk Flamingo's TT-based unit caps script
 
+
+rm = _G.rm; cm = get_cm();
+
+if not not rm then
+    
+local ctt_ovn_araby = {
+    
+    ---------------------------------------------------------------
+    --ARABY
+    ---------------------------------------------------------------
+
+    {"ovn_slave", "arb_core"},
+    {"OtF_khemri_spearmen", "arb_core"},
+    {"OtF_khemri_swordsmen", "arb_core"},
+    {"ovn_corsairs", "arb_core"},
+    {"OtF_khemri_archers", "arb_core"},
+    {"ovn_yeoman", "arb_core"},
+    {"OtF_khemri_knights", "arb_core"},
+    {"ovn_yeomanarchers", "arb_core"},
+    {"ovn_jag", "arb_special", 1},
+    {"ovn_glad", "arb_special", 1},
+    {"OtF_khemri_elite_guard", "arb_special", 1},
+    {"ovn_southlander", "arb_special", 1},
+    {"OtF_khemri_kepra_guard", "arb_special", 1},
+    {"OtF_khemri_rangers", "arb_special", 1},
+    {"ovn_arb_cav_lancer_camel", "arb_special", 1}, 
+    {"ovn_arb_cav_archer_camel", "arb_special", 1},
+    {"wh_main_arb_cav_magic_carpet_0", "arb_special", 1},
+    {"ovn_jez", "arb_special", 2},
+    {"ovn_cat_knights", "arb_special", 2},
+    {"ovn_arb_cav_jezzail_camel", "arb_special", 2},
+    {"sr_ogre_arb", "arb_special", 2},
+    {"ovn_ifreet", "arb_rare", 1},
+    {"ovn_scor", "arb_rare", 1},
+    {"akp_brt_ballista", "arb_rare", 1},
+    {"ovn_arb_art_trebuchet", "arb_rare", 1},
+    {"ovn_arb_mon_genie", "arb_rare", 1},
+    {"ovn_arb_cav_scorpion", "arb_rare", 2},
+    {"ovn_arb_art_grand_bombard", "arb_rare", 2},
+    {"wh_main_arb_mon_elephant", "arb_rare", 2},
+    {"wh_main_arb_mon_war_elephant", "arb_rare", 2},
+    {"ovn_prometheans", "arb_special", 2},
+    {"hous_nec", "arb_rare", 3},
+
+    {"ovn_knights_ror", "arb_core"},
+    {"ovn_jag_ror", "arb_special", 1},
+    {"ovn_jez_ror", "arb_special", 2},
+    {"ovn_cat_knights_ror", "arb_special", 2},
+    {"ovn_bom_ror", "arb_rare", 2},
+    {"ovn_elephant_ror", "arb_rare", 2},
+    {"ovn_arb_mon_war_elephant_ror", "arb_rare", 3}
+            } 
+
+local ctt_ovn_araby_loaned_units = {
+
+    ---------------------------------------------------------------
+    --ARABY
+    ---------------------------------------------------------------
+
+    {"wh_main_grn_mon_giant", "wh_main_sc_emp_araby", "arb_rare", 2},
+
+    {"wh2_dlc11_cst_mon_animated_hulks_0", "wh_main_sc_emp_araby", "arb_special", 1},
+    {"wh2_dlc11_cst_mon_bloated_corpse_0", "wh_main_sc_emp_araby", "arb_core"},
+
+    {"wh_main_chs_inf_chaos_warriors_0", "wh_main_sc_emp_araby", "arb_special", 1},
+    {"wh_dlc06_chs_inf_aspiring_champions_0", "wh_main_sc_emp_araby", "arb_special", 2},
+    {"wh_main_chs_cav_chaos_knights_0", "wh_main_sc_emp_araby", "arb_special", 2},
+    {"wh_main_chs_mon_chaos_spawn", "wh_main_sc_emp_araby", "arb_rare", 2},
+    {"wh2_dlc09_tmb_veh_skeleton_chariot_0", "wh_main_sc_emp_araby", "arb_special", 1},
+    {"wh2_dlc09_tmb_inf_nehekhara_warriors_0", "wh_main_sc_emp_araby", "arb_special", 1},
+    {"wh2_dlc09_tmb_inf_tomb_guard_1", "wh_main_sc_emp_araby", "arb_special", 2},
+    {"wh2_dlc09_tmb_cav_necropolis_knights_0", "wh_main_sc_emp_araby", "arb_special", 2},
+    {"wh2_dlc09_tmb_mon_ushabti_0", "wh_main_sc_emp_araby", "arb_special", 2}
+        }
+
+    rm:add_loaned_units_in_table(ctt_ovn_araby_loaned_units)
+
+    rm:add_units_in_table_to_tabletop_groups(ctt_ovn_araby)
+
+end
