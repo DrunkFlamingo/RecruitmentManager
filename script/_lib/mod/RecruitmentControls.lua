@@ -208,7 +208,7 @@ end
 
 local recruiter_manager = {} --# assume recruiter_manager: RECRUITER_MANAGER
 
---v function()
+--v function() --> RECRUITER_MANAGER
 function recruiter_manager.init()
     local self = {}
     setmetatable(self, {
@@ -268,13 +268,27 @@ function recruiter_manager.init()
     --stores settings for the points limits
     self._specialPointLimit = 10 --:int
     self._rarePointLimit = 5 --:int
+
+    --this is used to find which groups we should be displaying on the meter UI.
+    self._subculturePrefixes = {} --:map<string, string>
+
+    --units are appended into these lists then added at the end.
+    self._normalUnitsToAdd = {} --:vector<{string, string, number?}>
+    self._loanedUnitsToAdd = {} --:vector<{string, string, string, number?}>
+    self._unitTextOverrides = {} --:map<string, RM_UIPROFILE>
+    self._postSetupCallbacks = {} --:vector<function()>
+
     _G.rm = self
+    return self
 end
 
 --log text
---v function(self: RECRUITER_MANAGER, text: any) 
-function recruiter_manager.log(self, text)
+--v function(self: RECRUITER_MANAGER, text: any, echo: boolean?) 
+function recruiter_manager.log(self, text, echo)
     RCLOG(tostring(text))
+    if echo then
+        out("RECRUITER_MANAGER: " ..tostring(text))
+    end
 end
 
 --ui utility to get the names of the units in the queue by reading the UI.
@@ -1166,7 +1180,7 @@ end--]]
 
 
 --set the UI profile for a unit.
---# type global RM_UIPROFILE = {_text: string, _image: string}
+
 --v function(self: RECRUITER_MANAGER, unitID: string, UIprofile: RM_UIPROFILE)
 function recruiter_manager.set_ui_profile_for_unit(self, unitID, UIprofile)
     if not (is_string(UIprofile._image) and is_string(UIprofile._text)) then
@@ -1188,6 +1202,14 @@ function recruiter_manager.set_ui_profile_for_unit_override(self, abstractionID,
     end
     self._overrideUnits[abstractionID]:add_ui_profile(text, image_path)
 
+end
+
+--------------------------
+------NEW SUBCULTURES-----
+--------------------------
+--v function(self: RECRUITER_MANAGER, subculture: string, prefix: string)
+function recruiter_manager.set_group_prefix_for_subculture(self, subculture, prefix)
+    self._subculturePrefixes[subculture] = prefix
 end
 
 --------------------------
@@ -1229,99 +1251,32 @@ end
 --------------------------
 --v function(self: RECRUITER_MANAGER, loaned_units_table: vector<{string, string, string, number?}>)
 function recruiter_manager.add_loaned_units_in_table(self, loaned_units_table)
-    --localisations
-    local loc_core = effect.get_localised_string("ttc_group_name_core")
-    local loc_special = effect.get_localised_string("ttc_group_name_special")
-    local loc_rare = effect.get_localised_string("ttc_group_name_rare")
-    local loc_points = effect.get_localised_string("ttc_measurement_name")
-    local loc_limit = effect.get_localised_string("ttc_army_limited")
-    local loc_unlimited = effect.get_localised_string("ttc_army_unlimited")
-    local loc_unit_cost = effect.get_localised_string("ttc_unit_cost")
-    local loc_unit_no_cost = effect.get_localised_string("ttc_unit_no_cost")
     for i = 1, #loaned_units_table do
-        local current_entry = loaned_units_table[i]
-        local weight = current_entry[4] or 1
-        local override_name = current_entry[1].."_"..current_entry[3]
-        local override_unit = self:create_unit_override(current_entry[1], override_name, current_entry[3], current_entry[4])
-        if string.find(loaned_units_table[i][3], "core") then
-            local textstring = fill_loc(loc_unit_no_cost, loc_core) .. " \n" ..fill_loc(loc_unlimited, loc_core)
-            self:set_ui_profile_for_unit_override(override_name, 
-                textstring,
-                "ui/custom/recruitment_controls/common_units.png"
-            )
-        elseif string.find(loaned_units_table[i][3], "special") then
-            local textstring = fill_loc(loc_unit_cost, loc_special) .. "[[col:green]] "..weight.." [[/col]]"..loc_points..". \n"..fill_loc(loc_limit, tostring(self._specialPointLimit), loc_points, loc_special) 
-            self:set_ui_profile_for_unit_override(override_name, 
-                textstring,
-                "ui/custom/recruitment_controls/special_units_"..weight..".png"
-            )
-        elseif string.find(loaned_units_table[i][3], "rare") then
-            local textstring = fill_loc(loc_unit_cost, loc_rare) .. "[[col:green]] "..weight.." [[/col]]"..loc_points..". \n"..fill_loc(loc_limit, tostring(self._rarePointLimit), loc_points, loc_rare) 
-            self:set_ui_profile_for_unit_override(override_name, 
-                textstring,
-                "ui/custom/recruitment_controls/rare_units_"..weight..".png"
-            )
-        end
-        if not self._overrideSubcultureFilters[current_entry[2]] then
-            self._overrideSubcultureFilters[current_entry[2]] = {}
-        end
-        table.insert(self._overrideSubcultureFilters[current_entry[2]], override_unit)
+        table.insert(self._loanedUnitsToAdd, loaned_units_table[i])
     end
+    self:log("Queued "..tostring(#loaned_units_table).." units to be loaned.")
 end
 
 --------------------------
 -----MASS GROUPING API----
 --------------------------
 
---v function(self: RECRUITER_MANAGER, groups_table: vector<{string, string, number?}>, unit_text_overrides: map<string, RM_UIPROFILE>?) --> map<string, boolean>
+--v function(self: RECRUITER_MANAGER, groups_table: vector<{string, string, number?}>, unit_text_overrides: map<string, RM_UIPROFILE>?) --> table
 function recruiter_manager.add_units_in_table_to_tabletop_groups(self, groups_table, unit_text_overrides)
-    local groups = {} --:map<string, boolean>
-    --localisations
-    local loc_core = effect.get_localised_string("ttc_group_name_core")
-    local loc_special = effect.get_localised_string("ttc_group_name_special")
-    local loc_rare = effect.get_localised_string("ttc_group_name_rare")
-    local loc_points = effect.get_localised_string("ttc_measurement_name")
-    local loc_limit = effect.get_localised_string("ttc_army_limited")
-    local loc_unlimited = effect.get_localised_string("ttc_army_unlimited")
-    local loc_unit_cost = effect.get_localised_string("ttc_unit_cost")
-    local loc_unit_no_cost = effect.get_localised_string("ttc_unit_no_cost")
-
     for i = 1, #groups_table do
-        if not unit_text_overrides then
-            unit_text_overrides = {}
-        end
-        --# assume unit_text_overrides: map<string, RM_UIPROFILE>
-        if groups_table[i][3] then
-            self:set_weight_for_unit(groups_table[i][1], groups_table[i][3])
-        end
-        groups[groups_table[i][2]] = true;
-        self:add_unit_to_group(groups_table[i][1], groups_table[i][2])
-        local override = unit_text_overrides[groups_table[i][1]]
-        if override then
-            self:set_ui_profile_for_unit(groups_table[i][1], override)
-        elseif string.find(groups_table[i][2], "core") then
-            local textstring = fill_loc(loc_unit_no_cost, loc_core) .. " \n" ..fill_loc(loc_unlimited, loc_core)
-            self:set_ui_profile_for_unit(groups_table[i][1], {
-                _text = textstring,
-                _image = "ui/custom/recruitment_controls/common_units.png"
-            })
-        elseif string.find(groups_table[i][2], "special") then
-            local weight = groups_table[i][3] --# assume weight: number
-            local textstring = fill_loc(loc_unit_cost, loc_special) .. "[[col:green]] "..weight.." [[/col]]"..loc_points..". \n"..fill_loc(loc_limit, tostring(self._specialPointLimit), loc_points, loc_special) 
-            self:set_ui_profile_for_unit(groups_table[i][1], {
-                _text = textstring,
-                _image = "ui/custom/recruitment_controls/special_units_"..weight..".png"
-            })
-        elseif string.find(groups_table[i][2], "rare") then
-            local weight = groups_table[i][3] --# assume weight: number
-            local textstring = fill_loc(loc_unit_cost, loc_rare) .. "[[col:green]] "..weight.." [[/col]]"..loc_points..". \n"..fill_loc(loc_limit, tostring(self._rarePointLimit), loc_points, loc_rare) 
-            self:set_ui_profile_for_unit(groups_table[i][1], {
-                _text = textstring,
-                _image = "ui/custom/recruitment_controls/rare_units_"..weight..".png"
-            })
+        table.insert(self._normalUnitsToAdd, groups_table[i])
+    end
+    if unit_text_overrides then
+        --# assume unit_text_overrides : map<string, RM_UIPROFILE>
+        for key, override in pairs(unit_text_overrides) do
+            if self._unitTextOverrides[key] then
+                self:log("CONTENT WARNING: "..key.." has more than one overriden text entry being added!")
+            end
+            self._unitTextOverrides[key] = override
         end
     end
-    return groups
+    self:log("Queued "..tostring(#groups_table).." units to be added.")
+    return {} --this returns a table to avoid breaking scripts when people are using the outdated API format. It doesn't do anything.
 end
 
 --------------------------
@@ -1419,20 +1374,14 @@ function recruiter_manager.add_trait_requirement_for_unit_override(self, subtype
 end
 
 
+--v function(self: RECRUITER_MANAGER, callback: function())
+function recruiter_manager.add_post_setup_callback(self, callback)
+    table.insert(self._postSetupCallbacks, callback)
+end
+
+
 ---DEPRECATED API-----
 ----------------------
-
---these don't do anything, they just warn the modder
---v [NO_CHECK] function(self: RECRUITER_MANAGER, ...:any) 
-function recruiter_manager.add_subtype_group_override(self, ...)
-
-end
-
---these don't do anything, they just warn the modder
---v [NO_CHECK] function(self: RECRUITER_MANAGER, ...:any) 
-function recruiter_manager.whitelist_unit_for_subculture(self, ...)
-  
-end
 
 --these still function normally, they just warn the modder
 --v [NO_CHECK] function(self: RECRUITER_MANAGER, subtype: string) 
@@ -1443,8 +1392,8 @@ function recruiter_manager.register_subtype_as_char_bound_horde(self, subtype)
     self:add_subtype_path_filter(subtype, "CharBoundHordeWithGlobal")
 end
 
---v [NO_CHECK] function()
-local function init_mct()
+--v [NO_CHECK] function(rm: RECRUITER_MANAGER)
+local function init_mct(rm)
     local mct = core:get_static_object("mod_configuration_tool")
     if mct then
         core:add_listener(
@@ -1456,7 +1405,6 @@ local function init_mct()
                 local enable_rm = ttc_mod:get_option_by_key("a_enable")
                 enable_rm:set_read_only(true)
                 if enable_rm:get_finalized_setting() == true then
-                    local rm = _G.rm
                     local special_points = ttc_mod:get_option_by_key("b_special_points")
                     rm._specialPointLimit = special_points:get_finalized_setting()
                     special_points:set_read_only(true)
@@ -1472,10 +1420,261 @@ local function init_mct()
     end
 end
 
+
 --institation 
 if __game_mode == __lib_type_campaign then
-    recruiter_manager.init()
-    init_mct()
+    local rm = recruiter_manager.init()
+    init_mct(rm)
+
+    rm:log("Adding Listeners and First Tick Callbacks", true)
+    --implement the UIPathAssignment
+    core:add_listener(
+        "UIRecruiterCharacterCreatedUIPathAssignment",
+        "UIRecruiterCharacterCreated",
+        function(context)
+            return true
+        end,
+        function(context)
+            local char = context:character()
+            local rec_char = rm._recruiterCharacters[char:command_queue_index()]
+            --this is a raw get because if it went through the rm:get_character_by_cqi() method it could cause infinite loop, if RM somehow passes wrong character
+            local pathset = rm:evaluate_path_set_for_character(char)
+            if pathset then
+                rm:log("Pathset for character ["..tostring(char:command_queue_index()).."] found")
+                rec_char._UIPathSet = pathset
+            end
+        end,
+        true
+    )
+
+    --implementation for subtype and subculture filters on creation
+    core:add_listener(
+        "UIRecruiterCharacterCreatedUIPathAssignment",
+        "UIRecruiterCharacterCreated",
+        function(context)
+            return true
+        end,
+        function(context)
+            local char = context:character() --:CA_CHAR
+            local subculture = char:faction():subculture()
+            if rm._overrideSubcultureFilters[subculture] then
+                rm:log("New character has unit overrides from subculture: ")
+                for i = 1, #rm._overrideSubcultureFilters[subculture] do
+                    local abstractionID = rm._overrideSubcultureFilters[subculture][i]
+                    local abstraction = rm._overrideUnits[abstractionID]
+                    if abstraction then
+                        rm:log("Added unit override "..abstractionID)
+                        rm:get_character_by_cqi(char:command_queue_index()):add_overriden_unit_entry(abstraction:key(), abstraction)
+                    else
+                        rm:log("Error: Failed to add unit override. Could not find any object for "..abstractionID)
+                    end
+                end
+            end
+            local subtype = char:character_subtype_key()
+            if rm._overrideSubtypeFilters[subtype] then
+                rm:log("New character has unit overrides from subtype: ")
+                for i = 1, #rm._overrideSubtypeFilters[subtype] do
+                    local abstractionID = rm._overrideSubtypeFilters[subtype][i]
+                    local abstraction = rm._overrideUnits[abstractionID]
+                    if abstraction then
+                        rm:log("Added unit override "..abstractionID)
+                        rm:get_character_by_cqi(char:command_queue_index()):add_overriden_unit_entry(abstraction:key(), abstraction)
+                    else
+                        rm:log("Error: Failed to add unit override. Could not find any object for "..abstractionID)
+                    end
+                end
+            end
+        end,
+        true
+    )
+
+    local RECIEVED_SKILLS = {} --:map<string, vector<string>>
+
+    --v function(cqi: CA_CQI, skill: string)
+    local function RecruiterCharacterSkillGained(cqi, skill)
+        local cqi_as_string = tostring(cqi)
+        if not RECIEVED_SKILLS[cqi_as_string] then
+            RECIEVED_SKILLS[cqi_as_string] = {}
+        end
+        RECIEVED_SKILLS[cqi_as_string][(#RECIEVED_SKILLS[cqi_as_string])+1] = skill
+    end
+
+    --v function(cqi_as_string: string)
+    local function RecruiterCharacterSkillsLoaded(cqi_as_string)
+        local cqi = tonumber(cqi_as_string) --# assume cqi: CA_CQI
+        local char = cm:get_character_by_cqi(cqi)
+        local subtype = char:character_subtype_key()
+        local overrides = rm._overrideSkillRequirements[subtype] 
+        local skills = RECIEVED_SKILLS[tostring(cqi)]
+        for i = 1, #skills do
+            local skill = skills[i]
+            local abstraction = rm._overrideUnits[overrides[skill]]
+            if char:has_skill(skill) and abstraction then
+                rm:log("Loaded RM relevent skill: "..skill)
+                rm:get_character_by_cqi(char:command_queue_index()):add_overriden_unit_entry(abstraction:key(), abstraction)
+            end
+        end
+    end
+
+    cm:add_saving_game_callback(
+        function(context)
+            cm:save_named_value("RM_RECIEVED_SKILLS", RECIEVED_SKILLS, context);
+        end
+    );
+    cm:add_loading_game_callback(
+        function(context)
+            if cm:is_new_game() == false then
+                RECIEVED_SKILLS = cm:load_named_value("RM_RECIEVED_SKILLS", RECIEVED_SKILLS, context);
+            end
+        end
+    );
+    core:add_listener(
+        "RecruiterCharacterSkillPointAllocatedGenerator",
+        "CharacterSkillPointAllocated",
+        function(context)
+            local subtype_entry = rm._overrideSkillRequirements[context:character():character_subtype_key()]
+            return (not not subtype_entry) and not not subtype_entry[context:skill_point_spent_on()]
+        end,
+        function(context)
+            local char = context:character() --:CA_CHAR
+            local subtype = char:character_subtype_key()
+            local overrides = rm._overrideSkillRequirements[subtype] 
+            local skill = context:skill_point_spent_on()
+            local abstractionID = overrides[skill]
+            local abstraction = rm._overrideUnits[abstractionID]
+            if abstraction then
+                rm:log("Gained RM relevent skill: "..skill)
+                rm:get_character_by_cqi(char:command_queue_index()):add_overriden_unit_entry(abstraction:key(), abstraction)
+                RecruiterCharacterSkillGained(char:command_queue_index(), skill)
+            end
+        end,
+        true
+    )
+    
+    cm:add_first_tick_callback(function()
+        
+        local groups = {} --:map<string, boolean>
+        local units_already_added = {} --:map<string, boolean>
+        --localisations
+        local loc_core = effect.get_localised_string("ttc_group_name_core")
+        local loc_special = effect.get_localised_string("ttc_group_name_special")
+        local loc_rare = effect.get_localised_string("ttc_group_name_rare")
+        local loc_points = effect.get_localised_string("ttc_measurement_name")
+        local loc_limit = effect.get_localised_string("ttc_army_limited")
+        local loc_unlimited = effect.get_localised_string("ttc_army_unlimited")
+        local loc_unit_cost = effect.get_localised_string("ttc_unit_cost")
+        local loc_unit_no_cost = effect.get_localised_string("ttc_unit_no_cost")
+        local groups_table = rm._normalUnitsToAdd
+        local loaned_units_table = rm._loanedUnitsToAdd
+        local unit_text_overrides = rm._unitTextOverrides
+        local ok, err = pcall(function()
+
+        --this loads any changes from character skills in save games
+        for k, v in pairs(RECIEVED_SKILLS) do
+            RecruiterCharacterSkillsLoaded(k)
+        end
+
+        --this loop adds all basic units to the game.
+        rm:log("Adding "..tostring(#groups_table).." units to the caps system", true)
+        for i = 1, #groups_table do
+            --# assume unit_text_overrides: map<string, RM_UIPROFILE>
+            if groups_table[i][3] then
+                rm:set_weight_for_unit(groups_table[i][1], groups_table[i][3])
+            end
+            groups[groups_table[i][2]] = true;
+            if units_already_added[groups_table[i][1]] then
+                rm:log("CONTENT WARNING: "..groups_table[i][1].." is added to the system twice!")
+            else
+                units_already_added[groups_table[i][1]] = true
+                rm:log("Added "..groups_table[i][1].." to the tabletop caps system")
+            
+                rm:add_unit_to_group(groups_table[i][1], groups_table[i][2])
+                local override = unit_text_overrides[groups_table[i][1]]
+                if override then
+                    rm:set_ui_profile_for_unit(groups_table[i][1], override)
+                elseif string.find(groups_table[i][2], "core") then
+                    local textstring = fill_loc(loc_unit_no_cost, loc_core) .. " \n" ..fill_loc(loc_unlimited, loc_core)
+                    rm:set_ui_profile_for_unit(groups_table[i][1], {
+                        _text = textstring,
+                        _image = "ui/custom/recruitment_controls/common_units.png"
+                    })
+                elseif string.find(groups_table[i][2], "special") then
+                    local weight = groups_table[i][3] --# assume weight: number
+                    local textstring = fill_loc(loc_unit_cost, loc_special) .. "[[col:green]] "..weight.." [[/col]]"..loc_points..". \n"..fill_loc(loc_limit, tostring(rm._specialPointLimit), loc_points, loc_special) 
+                    rm:set_ui_profile_for_unit(groups_table[i][1], {
+                        _text = textstring,
+                        _image = "ui/custom/recruitment_controls/special_units_"..weight..".png"
+                    })
+                elseif string.find(groups_table[i][2], "rare") then
+                    local weight = groups_table[i][3] --# assume weight: number
+                    local textstring = fill_loc(loc_unit_cost, loc_rare) .. "[[col:green]] "..weight.." [[/col]]"..loc_points..". \n"..fill_loc(loc_limit, tostring(rm._rarePointLimit), loc_points, loc_rare) 
+                    rm:set_ui_profile_for_unit(groups_table[i][1], {
+                        _text = textstring,
+                        _image = "ui/custom/recruitment_controls/rare_units_"..weight..".png"
+                    })
+                end
+            end
+        end
+        rm:log("Finished adding units", true)
+        rm._normalUnitsToAdd = {}
+        end)
+        if not ok then
+            rm:log(err, true)
+        end
+        --this loop adds all loaned units to the game.
+        for i = 1, #loaned_units_table do
+            local current_entry = loaned_units_table[i]
+            local weight = current_entry[4] or 1
+            local abstractionID = current_entry[1].."_"..current_entry[3]
+            local override_unit = rm:create_unit_override(current_entry[1], abstractionID, current_entry[3], current_entry[4])
+            groups[current_entry[3]] = true
+            if string.find(loaned_units_table[i][3], "core") then
+                local textstring = fill_loc(loc_unit_no_cost, loc_core) .. " \n" ..fill_loc(loc_unlimited, loc_core)
+                rm:set_ui_profile_for_unit_override(abstractionID, 
+                    textstring,
+                    "ui/custom/recruitment_controls/common_units.png"
+                )
+            elseif string.find(loaned_units_table[i][3], "special") then
+                local textstring = fill_loc(loc_unit_cost, loc_special) .. "[[col:green]] "..weight.." [[/col]]"..loc_points..". \n"..fill_loc(loc_limit, tostring(rm._specialPointLimit), loc_points, loc_special) 
+                rm:set_ui_profile_for_unit_override(abstractionID, 
+                    textstring,
+                    "ui/custom/recruitment_controls/special_units_"..weight..".png"
+                )
+            elseif string.find(loaned_units_table[i][3], "rare") then
+                local textstring = fill_loc(loc_unit_cost, loc_rare) .. "[[col:green]] "..weight.." [[/col]]"..loc_points..". \n"..fill_loc(loc_limit, tostring(rm._rarePointLimit), loc_points, loc_rare) 
+                rm:set_ui_profile_for_unit_override(abstractionID, 
+                    textstring,
+                    "ui/custom/recruitment_controls/rare_units_"..weight..".png"
+                )
+            end
+            rm._overrideSubcultureFilters[current_entry[2]] = rm._overrideSubcultureFilters[current_entry[2]] or {}
+            table.insert(rm._overrideSubcultureFilters[current_entry[2]], abstractionID) 
+            rm:log(current_entry[2].." loaned unit: "..current_entry[1])
+        end
+        --this loop sets up the groups and their limits.
+        for name, _ in pairs(groups) do
+            if string.find(name, "core") then
+                rm:set_ui_name_for_group(name, loc_core)
+                --rm:add_character_quantity_limit_for_group(name, 21)
+            end
+            if string.find(name, "special") then
+                rm:set_ui_name_for_group(name, loc_special)
+                rm:add_character_quantity_limit_for_group(name, rm._specialPointLimit)
+            end
+            if string.find(name, "rare") then
+                rm:set_ui_name_for_group(name, loc_rare)
+                rm:add_character_quantity_limit_for_group(name, rm._rarePointLimit)
+            end
+            rm:log("Set name and quantity limit for group: "..name)
+        end
+        rm._loanedUnitsToAdd = {}
+        for i = 1, #rm._postSetupCallbacks do
+            rm._postSetupCallbacks[i]()
+        end
+        rm._postSetupCallbacks = {}
+    end)
+else
+    RCLOG("Recruiter Manager did not load: gametype is not __lib_type_campaign")
 end
 
 

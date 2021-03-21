@@ -8,7 +8,7 @@
 
 
 --# assume global class KOU_MODEL
-
+--# type global RM_UIPROFILE = {_text: string, _image: string}
 --# assume global class RECRUITER_MANAGER
 --# assume global class RECRUITER_CHARACTER
 --# assume global class RECRUITER_PATHSET

@@ -4,9 +4,9 @@ package.path = "script/campaign/mod/?.lua;script/_lib/mod/?.lua;script/campaign/
 require("RecruitmentControls")
 require("AICharacterRecruitmentControls")
 require("RecruitmentPanelUIImplementation")
-require("UICharacterPathSettings")
+require("TableTopCaps_vanilla_ui_settings")
 
 --export helpers
 require("RecruitmentControlsMeter")
-require("export_helpers__tt_groups")
+require("TabletopCaps_tt_groups")
 
