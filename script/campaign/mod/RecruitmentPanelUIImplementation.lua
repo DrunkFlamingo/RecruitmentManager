@@ -598,5 +598,5 @@ cm:add_first_tick_callback(function()
         end,
         true
     )
-
+    CampaignUI.ClearSelection()
 end)

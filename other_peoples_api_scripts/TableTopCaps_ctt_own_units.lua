@@ -383,7 +383,7 @@ local ctt_ovn_all_loaned_units = {
     ---------------------------------------------------------------
 
     {"wh_main_nor_mon_chaos_warhounds_0", "wh_main_sc_nor_warp", "wrp_core"},
-    {"wh_main_nor_inf_chaos_marauders_0", "wh_main_sc_nor_warp", "wrp_core"},
+    {"wh_main_nor_inf_chaos_marauders_0", "wh_main_sc_nor_warp", "wrp_rare", 3},
     {"wh_dlc08_nor_inf_marauder_hunters_0", "wh_main_sc_nor_warp", "wrp_core"},
     {"wh_main_nor_cav_marauder_horsemen_0", "wh_main_sc_nor_warp", "wrp_core"},
     {"wh_dlc08_nor_inf_marauder_berserkers_0", "wh_main_sc_nor_warp", "wrp_core"},

@@ -16,6 +16,9 @@ Enforcement
 --loops through the listview
 --checks the unit keys 
 --]]
+--# assume debug.getinfo: function(WHATEVER) --> map<string, string>
+
+
 if __game_mode ~= __lib_type_campaign then
 	--return
 end
@@ -1222,6 +1225,8 @@ function recruiter_manager.add_subtype_path_filter(self, subtype_key, pathID)
     if not self._UIPaths[pathID] then
         self:log("Added a subtype path set to ["..subtype_key.."] which doesn't exist ["..pathID.."]")
         self:log("Hopefully for you this a load order problem, because the script don't abort here.")
+    else
+        self:log("Added a subtype path set ["..pathID.."] to ["..subtype_key.."]")
     end
 end
 
@@ -1231,6 +1236,8 @@ function recruiter_manager.add_subculture_path_filter(self, subculture_key, path
     if not self._UIPaths[pathID] then
         self:log("Added a subculture default path set to ["..subculture_key.."] which doesn't exist ["..pathID.."]")
         self:log("Hopefully for you this a load order problem, because the script don't abort here.")
+    else
+        self:log("Added a subculture path set ["..pathID.."] to ["..subculture_key.."]")
     end
 end
 
@@ -1242,8 +1249,8 @@ function recruiter_manager.evaluate_path_set_for_character(self, character)
     elseif self._subculturePathSets[character:faction():subculture()] then
         return self:get_path_set(self._subculturePathSets[character:faction():subculture()])
     end
-    self:log("Found no valid path sets to match the character ["..tostring(character:command_queue_index()).."] returning a nil path")
-    return nil
+    self:log("Found no valid path sets to match the character ["..tostring(character:command_queue_index()).."] returning a default path")
+    return self:get_path_set("NormalFaction")
 end
 
 --------------------------
@@ -1275,7 +1282,8 @@ function recruiter_manager.add_units_in_table_to_tabletop_groups(self, groups_ta
             self._unitTextOverrides[key] = override
         end
     end
-    self:log("Queued "..tostring(#groups_table).." units to be added.")
+    local calling_file = debug.getinfo(2).source
+    self:log("Queued "..tostring(#groups_table).." units to be added from file "..calling_file)
     return {} --this returns a table to avoid breaking scripts when people are using the outdated API format. It doesn't do anything.
 end
 
