@@ -1,4 +1,5 @@
-cm = get_cm(); rm = _G.rm;
+local rm = core:get_static_object("recruitment_manager") 
+--# assume rm: RECRUITER_MANAGER
 local ast_line = "**********************************************************************\n"
 
 

@@ -1,4 +1,5 @@
-local rm = _G.rm
+local rm = core:get_static_object("recruitment_manager") 
+--# assume rm: RECRUITER_MANAGER
 
 
 --ai systems to enforce a proxy of recruitment controls on the AI

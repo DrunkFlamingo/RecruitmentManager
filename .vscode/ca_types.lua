@@ -551,6 +551,7 @@
 --# assume CORE.get_screen_resolution: method() --> (number, number)
 --# assume CORE.trigger_event: method(event_name: string, any...)
 --# assume CORE.add_static_object: method(name: string, value: any, override: boolean?)
+--# assume CORE.get_static_object: method(name: string) --> WHATEVER
 --# assume CORE.get_or_create_component: method(name: string, path: string, parent: CA_UIC?) --> CA_UIC
 
 -- POOLED RESOURCE

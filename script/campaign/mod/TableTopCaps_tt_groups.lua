@@ -1,4 +1,5 @@
-rm = _G.rm;
+local rm = core:get_static_object("recruitment_manager") 
+--# assume rm: RECRUITER_MANAGER
 
 
 local units = {
@@ -456,7 +457,7 @@ local units = {
     {"wh_dlc05_wef_mon_treeman_0", "wef_rare", 3},
     {"wh_dlc05_wef_inf_waywatchers_0", "wef_rare", 1},
     {"wh_dlc05_wef_cav_sisters_thorn_0", "wef_rare", 1},
-    {"wh_dlc16_wef_cav_great_stag_knights_0", "wef_rare", 1},
+    {"wh2_dlc16_wef_cav_great_stag_knights_0", "wef_rare", 1},
     {"wh2_dlc16_wef_mon_malicious_treeman_0", "wef_rare", 3},
     {"wh2_dlc16_wef_mon_zoats", "wef_rare", 1},
     -------ROR-------
@@ -741,22 +742,22 @@ local units = {
     
     -------FACTION UNIQUES-------
     --CORE
-    {"wh2_dlc10_hef_inf_dryads_0", "hef_core"}, --ALARIELLE
+    {"wh2_dlc10_hef_inf_dryads_0", "hef_core"}, --ALARIELLE UNIQUE
     --SPECIAL
-    {"wh2_dlc10_hef_mon_treekin_0", "hef_special", 2}, --ALARIELLE
-    {"wh2_dlc10_hef_inf_shadow_walkers_0", "hef_special", 2}, --ALITH ANAR
-    {"wh2_dlc15_hef_inf_mistwalkers_faithbearers_0", "hef_special", 1},  --ELTHARION
-    {"wh2_dlc15_hef_inf_mistwalkers_sentinels_0", "hef_special", 1}, --ELTHARION
-    {"wh2_dlc15_hef_inf_mistwalkers_skyhawks_0", "hef_special", 1}, --ELTHARION
-    {"wh2_dlc15_hef_inf_mistwalkers_spireguard_0", "hef_special", 1}, --ELTHARION
+    {"wh2_dlc10_hef_mon_treekin_0", "hef_special", 2}, --ALARIELLE UNIQUE
+    {"wh2_dlc10_hef_inf_shadow_walkers_0", "hef_special", 2}, --ALITH ANAR UNIQUE
+    {"wh2_dlc15_hef_inf_mistwalkers_faithbearers_0", "hef_special", 1},  --ELTHARION UNIQUE
+    {"wh2_dlc15_hef_inf_mistwalkers_sentinels_0", "hef_special", 1}, --ELTHARION UNIQUE
+    {"wh2_dlc15_hef_inf_mistwalkers_skyhawks_0", "hef_special", 1}, --ELTHARION UNIQUE
+    {"wh2_dlc15_hef_inf_mistwalkers_spireguard_0", "hef_special", 1}, --ELTHARION UNIQUE
     --RARE
-    {"wh2_dlc10_hef_mon_treeman_0", "hef_rare", 3}, --ALARIELLE
-    {"wh2_dlc15_hef_inf_mistwalkers_griffon_knights_0", "hef_rare", 3}, --ELTHARION
-    {"wh2_dlc15_hef_mon_black_dragon_imrik", "hef_rare", 3}, --IMRIK
-    {"wh2_dlc15_hef_mon_forest_dragon_imrik", "hef_rare", 3}, --IMRIK
-    {"wh2_dlc15_hef_mon_moon_dragon_imrik", "hef_rare", 3}, --IMRIK
-    {"wh2_dlc15_hef_mon_star_dragon_imrik", "hef_rare", 3}, --IMRIK
-    {"wh2_dlc15_hef_mon_sun_dragon_imrik", "hef_rare", 2}, --IMRIK
+    {"wh2_dlc10_hef_mon_treeman_0", "hef_rare", 3}, --ALARIELLE UNIQUE
+    {"wh2_dlc15_hef_inf_mistwalkers_griffon_knights_0", "hef_rare", 3}, --ELTHARION UNIQUE
+    {"wh2_dlc15_hef_mon_black_dragon_imrik", "hef_rare", 3}, --IMRIK UNIQUE
+    {"wh2_dlc15_hef_mon_forest_dragon_imrik", "hef_rare", 3}, --IMRIK UNIQUE
+    {"wh2_dlc15_hef_mon_moon_dragon_imrik", "hef_rare", 3}, --IMRIK UNIQUE
+    {"wh2_dlc15_hef_mon_star_dragon_imrik", "hef_rare", 3}, --IMRIK UNIQUE
+    {"wh2_dlc15_hef_mon_sun_dragon_imrik", "hef_rare", 2}, --IMRIK UNIQUE
     
     -------ROR-------
     --CORE
@@ -791,6 +792,7 @@ local units = {
     {"wh2_main_def_inf_witch_elves_0", "def_core"},
     {"wh2_main_def_cav_dark_riders_0", "def_core"},
     {"wh2_main_def_cav_dark_riders_1", "def_core"},
+    {"wh_twa03_def_inf_squig_explosive_0", "def_core"}, --RAKARTH UNIQUE
     --SPECIAL
     {"wh2_main_def_inf_harpies", "def_special", 1},
     {"wh2_dlc10_def_mon_feral_manticore_0", "def_special", 2},
@@ -804,6 +806,7 @@ local units = {
     {"wh2_main_def_cav_cold_one_chariot", "def_special", 2},
     {"wh2_dlc10_def_cav_doomfire_warlocks_0", "def_special", 2},
     {"wh2_dlc14_def_cav_scourgerunner_chariot_0", "def_special", 2},
+    {"wh2_twa03_def_mon_wolves_0", "def_special", 1}, --RAKARTH UNIQUE
     --RARE
     {"wh2_main_def_art_reaper_bolt_thrower", "def_rare", 1},
     {"wh2_main_def_mon_black_dragon", "def_rare", 3},
@@ -811,6 +814,7 @@ local units = {
     {"wh2_dlc10_def_mon_kharibdyss_0", "def_rare", 2},
     {"wh2_dlc14_def_mon_bloodwrack_medusa_0", "def_rare", 1},
     {"wh2_dlc14_def_veh_bloodwrack_shrine_0", "def_rare", 2},
+    {"wh2_twa03_def_mon_war_mammoth_0", "def_rare", 2}, --RAKARTH UNIQUE
     
     -------ROR-------
     --CORE

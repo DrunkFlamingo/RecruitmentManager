@@ -209,16 +209,19 @@ end
 
 
 
-local recruiter_manager = {} --# assume recruiter_manager: RECRUITER_MANAGER
+local recruiter_manager = {} 
+--# assume recruiter_manager: RECRUITER_MANAGER
 
---v function() --> RECRUITER_MANAGER
-function recruiter_manager.init()
+
+--v function(supress_log:boolean?) --> RECRUITER_MANAGER
+function recruiter_manager.init(supress_log)
     local self = {}
     setmetatable(self, {
         __index = recruiter_manager,
         __tostring = function() return "RECRUITER_MANAGER" end
     }) --# assume self: RECRUITER_MANAGER
 
+    self.supress_log = supress_log or false
     --Stores path sets: used to find the way to the UI
     self._UIPaths = {} --:map<string, RECRUITER_PATHSET>
     self._subculturePathSets = {} --:map<string, string>
@@ -277,17 +280,21 @@ function recruiter_manager.init()
 
     --units are appended into these lists then added at the end.
     self._normalUnitsToAdd = {} --:vector<{string, string, number?}>
+    self._overriddenUnitSettings = {} --:map<string, {string, string, number?}>
     self._loanedUnitsToAdd = {} --:vector<{string, string, string, number?}>
     self._unitTextOverrides = {} --:map<string, RM_UIPROFILE>
     self._postSetupCallbacks = {} --:vector<function()>
 
-    _G.rm = self
+
     return self
 end
 
 --log text
 --v function(self: RECRUITER_MANAGER, text: any, echo: boolean?) 
 function recruiter_manager.log(self, text, echo)
+    if self.supress_log then
+        return
+    end
     RCLOG(tostring(text))
     if echo then
         out("RECRUITER_MANAGER: " ..tostring(text))
@@ -1287,6 +1294,20 @@ function recruiter_manager.add_units_in_table_to_tabletop_groups(self, groups_ta
     return {} --this returns a table to avoid breaking scripts when people are using the outdated API format. It doesn't do anything.
 end
 
+--v function(self: RECRUITER_MANAGER, groups_table: vector<{string, string, number?}>)
+function recruiter_manager.override_default_settings_for_vanilla_units(self, groups_table)
+    for i = 1, #groups_table do
+        local unit = groups_table[i][1]
+        if self._overriddenUnitSettings[unit] then
+            self:log("CONTENT WARNING: "..unit.." has more than one overwrite of vanilla settings. More than one mod is trying to change them, so we're only accepting the first one we recieve")
+        else
+            self._overriddenUnitSettings[unit] = groups_table[i]
+        end
+    end
+    local calling_file = debug.getinfo(2).source
+    self:log("overwrote the default settings for "..tostring(#groups_table).." units. From "..calling_file)
+end
+
 --------------------------
 ----AI CAP REPLICATION----
 --------------------------
@@ -1400,6 +1421,20 @@ function recruiter_manager.register_subtype_as_char_bound_horde(self, subtype)
     self:add_subtype_path_filter(subtype, "CharBoundHordeWithGlobal")
 end
 
+--these don't do anything, they just warn the modder
+--v [NO_CHECK] function(self: RECRUITER_MANAGER, ...:any) 
+function recruiter_manager.add_subtype_group_override(self, ...)
+    self:log("OUTDATED API METHOD add_subtype_group_override")
+end
+
+--these don't do anything, they just warn the modder
+--v [NO_CHECK] function(self: RECRUITER_MANAGER, ...:any) 
+function recruiter_manager.whitelist_unit_for_subculture(self, ...)
+    self:log("OUTDATED API METHOD whitelist_unit_for_subculture")
+end
+
+
+
 --v [NO_CHECK] function(rm: RECRUITER_MANAGER)
 local function init_mct(rm)
     local mct = core:get_static_object("mod_configuration_tool")
@@ -1428,10 +1463,35 @@ local function init_mct(rm)
     end
 end
 
+--v [NO_CHECK] function(wrapper: WHATEVER, rm_instance: RECRUITER_MANAGER)
+local function wrap_to_ignore_eh_files(wrapper, rm_instance)
+    setmetatable(wrapper, {
+        __index = function(t, k)
+            if type(rm_instance[k]) == "function" then
+                local source = debug.getinfo(2).source
+                if string.find(debug.getinfo(2).source, "export_helper") then
+                    rm_instance:log("Rejected a call from "..source)
+                    rm_instance:log("Export helpers are not supported!")
+                    local dummy_rm_copy = recruiter_manager.init(true)
+                    return dummy_rm_copy[k]
+                else
+                    return rm_instance[k]
+                end
+            else
+                return rm_instance[k]
+            end
+        end
+    })
+    _G.rm = wrapper
+end
 
 --institation 
 if __game_mode == __lib_type_campaign then
     local rm = recruiter_manager.init()
+    _G.rm = rm
+    core:add_static_object("recruitment_manager", rm)
+    local wrapper = {}
+    wrap_to_ignore_eh_files(wrapper, rm)
     init_mct(rm)
 
     rm:log("Adding Listeners and First Tick Callbacks", true)
@@ -1590,7 +1650,40 @@ if __game_mode == __lib_type_campaign then
                 rm:set_weight_for_unit(groups_table[i][1], groups_table[i][3])
             end
             groups[groups_table[i][2]] = true;
-            if units_already_added[groups_table[i][1]] then
+            if rm._overriddenUnitSettings[groups_table[i][1]] then
+                if units_already_added[groups_table[i][1]] then
+                    rm:log("Skipped "..groups_table[i][1].." because it's setting were overriden")
+                else
+                    local info = rm._overriddenUnitSettings[groups_table[i][1]]
+                    units_already_added[groups_table[i][1]] = true
+                    rm:log("Overwrote "..groups_table[i][1].." in the tabletop caps system!")      
+                    rm:add_unit_to_group(info[1],info[2])
+                    local override = unit_text_overrides[info[1]]
+                    if override then
+                        rm:set_ui_profile_for_unit(info[1], override)
+                    elseif string.find(info[2], "core") then
+                        local textstring = fill_loc(loc_unit_no_cost, loc_core) .. " \n" ..fill_loc(loc_unlimited, loc_core)
+                        rm:set_ui_profile_for_unit(info[1], {
+                            _text = textstring,
+                            _image = "ui/custom/recruitment_controls/common_units.png"
+                        })
+                    elseif string.find(info[2], "special") then
+                        local weight = info[3] --# assume weight: number
+                        local textstring = fill_loc(loc_unit_cost, loc_special) .. "[[col:green]] "..weight.." [[/col]]"..loc_points..". \n"..fill_loc(loc_limit, tostring(rm._specialPointLimit), loc_points, loc_special) 
+                        rm:set_ui_profile_for_unit(info[1], {
+                            _text = textstring,
+                            _image = "ui/custom/recruitment_controls/special_units_"..weight..".png"
+                        })
+                    elseif string.find(info[2], "rare") then
+                        local weight = info[3] --# assume weight: number
+                        local textstring = fill_loc(loc_unit_cost, loc_rare) .. "[[col:green]] "..weight.." [[/col]]"..loc_points..". \n"..fill_loc(loc_limit, tostring(rm._rarePointLimit), loc_points, loc_rare) 
+                        rm:set_ui_profile_for_unit(info[1], {
+                            _text = textstring,
+                            _image = "ui/custom/recruitment_controls/rare_units_"..weight..".png"
+                        })
+                    end
+                end        
+            elseif units_already_added[groups_table[i][1]] then
                 rm:log("CONTENT WARNING: "..groups_table[i][1].." is added to the system twice!")
             else
                 units_already_added[groups_table[i][1]] = true

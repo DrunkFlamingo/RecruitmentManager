@@ -1,7 +1,8 @@
 --updates the values on an event: RecruiterManagerGroupCountUpdated
 --Self-hides on recruitment panel closed event.
 --auotdisplays whenever value is updated and rec panel is visible. 
-local rm = _G.rm
+local rm = core:get_static_object("recruitment_manager") 
+--# assume rm: RECRUITER_MANAGER
 local GROUP_KEY_TO_UIC = {} --:map<string, CA_UIC>
 
 local group_image_paths = {
@@ -16,8 +17,6 @@ local created_uic = {} --:vector<string>
 
 --overrides for some subcultures. 
 
-
-local prefix_to_subculture = nil
 
 
 
@@ -98,10 +97,12 @@ cm.first_tick_callbacks[#cm.first_tick_callbacks+1] = function(context)
             return context:character():faction():is_human()
         end,
         function(context)
+            local subculture = context:character():faction():subculture()
             local rec_char = rm:get_character_by_cqi(context:character():command_queue_index())
-            local subculture_prefix = rm._subculturePrefixes[context:character():faction():subculture()]
+            local subculture_prefix = rm._subculturePrefixes[subculture]
             --first, lets make sure we have at least default entries for all of this stuff.
             if not subculture_prefix then
+                rm:log("No subculture prefix found for "..subculture)
                 return
             end
             for suffix, _ in pairs(group_image_paths) do
