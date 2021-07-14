@@ -94,7 +94,7 @@ cm.first_tick_callbacks[#cm.first_tick_callbacks+1] = function(context)
         "RecruiterManagerGroupCountUpdated",
         "RecruiterManagerGroupCountUpdated",
         function(context)
-            return context:character():faction():is_human()
+            return context:character():faction():is_human() and rm._isEnforcementEnabled
         end,
         function(context)
             local subculture = context:character():faction():subculture()

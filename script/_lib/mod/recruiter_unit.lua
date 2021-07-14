@@ -68,6 +68,8 @@ end
 function recruiter_unit.get_localised_string(self)
    if self._landUnit then
       return effect.get_localised_string("land_units_onscreen_name_"..self._landUnit)
+   elseif self._isOverride and self._baseUnit._landUnit then
+      return effect.get_localised_string("land_units_onscreen_name_"..self._baseUnit._landUnit)
    else
       return effect.get_localised_string("land_units_onscreen_name_"..self._key)
    end

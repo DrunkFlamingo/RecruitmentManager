@@ -18,7 +18,7 @@ end
 cm:add_first_tick_callback(function()
 
     if not check_mct() then
-        return
+        --return
     end
     --localisations
     local loc_points = effect.get_localised_string("ttc_measurement_name")
@@ -540,7 +540,7 @@ cm:add_first_tick_callback(function()
         "RecruiterManagerOnExchangePanelOpened",
         "PanelOpenedCampaign",
         function(context) 
-            return context.string == "unit_exchange"; 
+            return rm._isEnforcementEnabled and context.string == "unit_exchange"; 
         end,
         function(context)
             cm:callback(function() --do this on a delay so the panel has time to fully open before the script tries to read it!

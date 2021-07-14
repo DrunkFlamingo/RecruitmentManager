@@ -389,6 +389,7 @@ local units = {
     {"wh_dlc03_bst_inf_ungor_herd_1", "bst_core"},
     {"wh_dlc03_bst_inf_ungor_spearmen_0", "bst_core"},
     {"wh_dlc03_bst_inf_ungor_spearmen_1", "bst_core"},
+    {"wh2_dlc17_bst_cav_tuskgor_chariot_0", "bst_core"},
     --SPECIAL
     {"wh_dlc03_bst_inf_minotaurs_0", "bst_special", 2},
     {"wh_dlc03_bst_inf_minotaurs_1", "bst_special", 2},
@@ -405,7 +406,8 @@ local units = {
     {"wh_dlc03_bst_mon_chaos_spawn_0", "bst_rare", 1},
     {"wh_dlc03_bst_mon_giant_0", "bst_rare", 2},
     {"wh_dlc03_bst_inf_cygor_0", "bst_rare", 3},
-    {"wh_pro04_bst_inf_cygor_ror_0", "bst_rare", 3},
+    {"wh2_dlc17_bst_mon_ghorgon_0", "bst_rare", 3},
+    {"wh2_dlc17_bst_mon_jabberslythe_0", "bst_rare", 3},
     
     -------ROR-------
     --CORE
@@ -415,7 +417,11 @@ local units = {
     {"wh_pro04_bst_inf_bestigor_herd_ror_0", "bst_special", 1},
     {"wh_pro04_bst_inf_centigors_ror_0", "bst_special", 1},
     {"wh_pro04_bst_inf_minotaurs_ror_0", "bst_special", 2},
-    
+    {"wh2_dlc17_bst_inf_centigors_ror_1", "bst_special", 2},
+    {"wh2_dlc17_bst_mon_ghorgon_ror_0", "bst_rare", 3},
+    --RARE
+    {"wh2_dlc17_bst_mon_jabberslythe_ror_0", "bst_rare", 3},
+    {"wh_pro04_bst_inf_cygor_ror_0", "bst_rare", 3},
     ---------------------------------------------------------------
     --WOOD ELVES
     ---------------------------------------------------------------
@@ -430,7 +436,7 @@ local units = {
     {"wh_dlc05_wef_inf_dryads_0", "wef_core"},
     {"wh_dlc05_wef_inf_eternal_guard_0", "wef_core"},
     {"wh_dlc05_wef_inf_eternal_guard_1", "wef_core"},
-    {"wh_dlc16_wef_cav_glade_riders_2", "wef_core"},
+    {"wh2_dlc16_wef_cav_glade_riders_2", "wef_core"},
     {"wh2_dlc16_wef_inf_malicious_dryads_0", "wef_core"},
     {"wh2_dlc16_wef_mon_cave_bats", "wef_core"},
     {"wh2_dlc16_wef_mon_spider_hatchlings_0", "wef_core"},
@@ -571,6 +577,9 @@ local units = {
     {"wh2_dlc12_lzd_mon_ancient_stegadon_1", "lzd_rare", 3},
     {"wh2_dlc13_lzd_mon_dread_saurian_0", "lzd_rare", 2},
     {"wh2_dlc13_lzd_mon_dread_saurian_1", "lzd_rare", 3},
+    {"wh2_dlc17_lzd_inf_chameleon_stalkers_0", "lzd_rare", 1},
+    {"wh2_dlc17_lzd_mon_coatl_0", "lzd_rare", 2},
+    {"wh2_dlc17_lzd_mon_troglodon_0", "lzd_rare", 2},
     
     -------BLESSED-------
     --CORE
@@ -613,7 +622,9 @@ local units = {
     --RARE
     {"wh2_dlc12_lzd_mon_ancient_stegadon_ror_0", "lzd_rare", 3},
     {"wh2_dlc13_lzd_mon_dread_saurian_ror_0", "lzd_rare", 3},
-    
+    {"wh2_dlc17_lzd_mon_carnosaur_ror_0", "lzd_rare", 2},
+    {"wh2_dlc17_lzd_mon_coatl_ror_0", "lzd_rare", 3},
+    {"wh2_dlc17_lzd_mon_troglodon_ror_0", "lzd_rare", 2},
     
     ---------------------------------------------------------------
     --SKAVEN
@@ -943,7 +954,16 @@ local units = {
     {"wh2_dlc11_cst_mon_rotting_prometheans_gunnery_mob_ror", "cst_special", 2},
     --RARE
     {"wh2_dlc11_cst_mon_mournguls_ror_0", "cst_rare", 1},
-    {"wh2_dlc11_cst_mon_necrofex_colossus_ror_0", "cst_rare", 3}
+    {"wh2_dlc11_cst_mon_necrofex_colossus_ror_0", "cst_rare", 3},
+
+    ---------------------------------------------------------------
+    --OGRE MERCENARIES
+    ---------------------------------------------------------------
+    {"wh2_twa05_ogr_cav_mournfang_cavalry_0", "emp_rare", 2},
+    {"wh2_twa05_ogr_inf_maneaters_2", "emp_rare", 2},
+    {"wh2_twa05_ogr_inf_maneaters_3", "emp_rare", 2},
+    {"wh2_twa05_ogr_inf_ogres_0", "emp_special", 1},
+    {"wh2_twa05_ogr_inf_ogres_1", "emp_special", 1}
     
 } --:vector<{string, string, number?}> 
 
@@ -954,11 +974,20 @@ local unit_text_overrides = {
     }
 }--:map<string, RM_UIPROFILE>
 
+--assign units to empire then load to this table to make a unit universal.
+local all_other_subcultures = {"wh_dlc03_sc_bst_beastmen", "wh_dlc05_sc_wef_wood_elves", "wh_main_sc_brt_bretonnia", "wh_main_sc_chs_chaos", "wh_main_sc_dwf_dwarfs", "wh_main_sc_grn_greenskins", "wh_main_sc_ksl_kislev", "wh_main_sc_nor_norsca", "wh_main_sc_teb_teb", "wh_main_sc_vmp_vampire_counts", "wh2_dlc09_sc_tmb_tomb_kings", "wh2_main_sc_def_dark_elves", 
+"wh2_main_sc_hef_high_elves", "wh2_main_sc_lzd_lizardmen", "wh2_main_sc_skv_skaven", "wh2_dlc11_sc_cst_vampire_coast"}
+
 local loaned_units = {
     {"wh2_main_lzd_cav_cold_ones_feral_0", "wh2_main_sc_def_dark_elves", "def_core"},
     {"wh2_main_lzd_mon_stegadon_0", "wh2_main_sc_def_dark_elves", "def_special", 3},
-    {"wh2_main_lzd_mon_carnosaur_0", "wh2_main_sc_def_dark_elves", "def_rare", 2}
-}--:vector<{string, string, string, number?}>
+    {"wh2_main_lzd_mon_carnosaur_0", "wh2_main_sc_def_dark_elves", "def_rare", 2},
+    {"wh2_twa05_ogr_cav_mournfang_cavalry_0", all_other_subcultures, "rare", 2},
+    {"wh2_twa05_ogr_inf_maneaters_2",all_other_subcultures, "rare", 2},
+    {"wh2_twa05_ogr_inf_maneaters_3", all_other_subcultures, "rare", 2},
+    {"wh2_twa05_ogr_inf_ogres_0", all_other_subcultures, "special", 1},
+    {"wh2_twa05_ogr_inf_ogres_1", all_other_subcultures, "special", 1}
+}--:vector<{string, string|vector<string>, string, number?}>
 
 ---info tables end---
 
