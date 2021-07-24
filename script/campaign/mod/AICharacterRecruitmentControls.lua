@@ -71,7 +71,7 @@ local function rm_ai_character(character)
         local group_totals = {} --:map<string, number>
         for j = 0, unit_list:num_items() - 1 do
             local unit = unit_list:item_at(j):unit_key()
-            local groups_list = rm:get_unit(unit, rec_char):groups()
+            local groups_list = rec_char:get_unit(unit):groups()
             for groupID, _ in pairs(groups_list) do
                 increment_group_total(group_totals, groupID, rm:get_weight_for_unit(unit, rec_char))
             end

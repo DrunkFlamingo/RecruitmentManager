@@ -63,7 +63,7 @@ local function update_display(uic, rec_char, groupID)
     if name and quantity and cap then
         local tt_string = fill_loc(loc_meter_tooltip, tostring(quantity), tostring(cap), name, loc_points)
         for unit_key, num_units in pairs(rec_char._armyCounts) do
-            local rec_unit = rm:get_unit(unit_key, rec_char)
+            local rec_unit = rec_char:get_unit(unit_key)
             if rec_unit:has_group(groupID) then
                 local num_points = (num_units + (rec_char._queueCounts[unit_key] or 0)) * rec_unit:weight()
                 local unit_loc = rec_unit:get_localised_string()
@@ -75,11 +75,24 @@ local function update_display(uic, rec_char, groupID)
         end
         for unit_key, num_units in pairs(rec_char._queueCounts) do
             if rec_char._armyCounts[unit_key] == 0 and num_units > 0 then
-                local rec_unit = rm:get_unit(unit_key, rec_char)
+                local rec_unit = rec_char:get_unit(unit_key)
                 if rec_unit:has_group(groupID) then
                     local num_points = num_units * rec_unit:weight()
                     tt_string = tt_string .. rec_unit:get_localised_string() .. ":  [[col:green]]" .. tostring(num_points) .. "[[/col]]\n"
                 end
+            end
+        end
+        local mercs = {} --:map<RECRUITER_UNIT, number>
+        for k = 1, #rec_char._mercenaryQueue do
+            local rec_unit = rec_char._mercenaryQueue[k]
+            mercs[rec_unit] = mercs[rec_unit] or 0
+            mercs[rec_unit] = mercs[rec_unit] + 1
+        end
+        for rec_unit, num_units in pairs(mercs) do
+            local unit_key = rec_unit:key()
+            if rec_unit:has_group(groupID) then
+                local num_points = num_units * rec_unit:weight()
+                tt_string = tt_string .. rec_unit:get_localised_string() .. ":  [[col:green]]" .. tostring(num_points) .. "[[/col]]\n"
             end
         end
         uic:SetTooltipText(tt_string, true)
@@ -142,7 +155,6 @@ cm.first_tick_callbacks[#cm.first_tick_callbacks+1] = function(context)
                         can_auth = false 
                         cm:callback(function() 
                             rec_char:set_queue_stale()
-                            rm:check_all_units_on_character(rec_char)
                             rm:enforce_all_units_on_current_character()
                             can_auth = true
                         end, 0.1, "RMauth2")
@@ -181,7 +193,6 @@ cm.first_tick_callbacks[#cm.first_tick_callbacks+1] = function(context)
             return not not string.find(context.string, "rm_display_")
         end,
         function(context)
-            rm:check_all_units_on_character(rm:current_character())
             rm:enforce_all_units_on_current_character()
         end,
         true
