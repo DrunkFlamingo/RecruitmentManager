@@ -23,6 +23,7 @@ cm:add_first_tick_callback(function()
     --localisations
     local loc_points = effect.get_localised_string("ttc_measurement_name")
     local loc_restriction = effect.get_localised_string("ttc_restriction_tooltip")
+
     --add unit added to queue listener
     core:add_listener(
         "RecruiterManagerOnRecruitOptionClicked",
@@ -30,7 +31,10 @@ cm:add_first_tick_callback(function()
         true,
         function(context)
             --# assume context: CA_UIContext
-            local unit_component_ID = tostring(UIComponent(context.component):Id())
+            local uic = UIComponent(context.component)
+            local unit_component_ID = tostring(uic:Id())
+            local pin = find_uicomponent(uic, "pin_parent", "button_pin")
+            if pin and string.find(pin:CurrentState(), "hover") then return end
             --is our clicked component a unit?
             if string.find(unit_component_ID, "_recruitable") and UIComponent(context.component):CurrentState() == "active" and (not UIComponent(context.component):GetTooltipText():find("col:red")) then
                 --print_all_uicomponent_children(UIComponent(context.component))
@@ -40,10 +44,11 @@ cm:add_first_tick_callback(function()
                 --reduce the string to get the name of the unit.
                 local unitID = string.gsub(unit_component_ID, "_recruitable", "")
                 --add the unit to queue so that our model knows it exists.
-                rm:add_unit_to_character_queue_and_refresh_limits(unitID, rm:current_character())
-                rm:enforce_unit_and_grouped_units(unitID, rm:current_character())
-                rm:output_state(rm:current_character())
-                core:trigger_event("RecruiterManagerGroupCountUpdated", cm:get_character_by_cqi(rm:current_character():command_queue_index()))
+                local rec_char = rm:current_character()
+                rec_char:add_unit_to_queue(unitID)
+                rm:enforce_unit_and_grouped_units(unitID, rec_char)
+                rm:output_state(rec_char)
+                core:trigger_event("RecruiterManagerGroupCountUpdated", cm:get_character_by_cqi(rec_char:command_queue_index()))
             end
         end,
         true);
@@ -54,7 +59,10 @@ cm:add_first_tick_callback(function()
         true,
         function(context)
             --# assume context: CA_UIContext
-            local unit_component_ID = tostring(UIComponent(context.component):Id())
+            local uic = UIComponent(context.component)
+            local unit_component_ID = tostring(uic:Id())
+            local pin = find_uicomponent(uic, "pin_parent", "button_pin")
+            if pin and string.find(pin:CurrentState(), "hover") then return end
             --is our clicked component a unit?
             if string.find(unit_component_ID, "_mercenary") and UIComponent(context.component):CurrentState() == "active" and (not UIComponent(context.component):GetTooltipText():find("col:red")) then
                 --its a unit! steal the users input so that they don't click more shit while we calculate.
@@ -63,10 +71,11 @@ cm:add_first_tick_callback(function()
                 --reduce the string to get the name of the unit.
                 local unitID = string.gsub(unit_component_ID, "_mercenary", "")
                 --add the unit to queue so that our model knows it exists.
-                rm:add_unit_to_character_queue_and_refresh_limits(unitID, rm:current_character(), true)
-                rm:enforce_unit_and_grouped_units(unitID, rm:current_character())
-                rm:output_state(rm:current_character())
-                core:trigger_event("RecruiterManagerGroupCountUpdated", cm:get_character_by_cqi(rm:current_character():command_queue_index()))
+                local rec_char = rm:current_character()
+                rec_char:queue_mercenary(rec_char:get_unit(unitID))
+                rm:enforce_unit_and_grouped_units(unitID, rec_char)
+                rm:output_state(rec_char)
+                core:trigger_event("RecruiterManagerGroupCountUpdated", cm:get_character_by_cqi(rec_char:command_queue_index()))
             end
         end,
         true);
@@ -103,7 +112,7 @@ cm:add_first_tick_callback(function()
             end
             if not current_character:is_queue_stale() then --if we aren't stale, we must have a unit
                 rm:log("Queued Unit name to be removed is: "..unitID)
-                rm:remove_unit_from_character_queue_and_refresh_limits(unitID, current_character)
+                current_character:remove_unit_from_queue(unitID)
                 rm:enforce_unit_and_grouped_units(unitID, rm:current_character())
                 rm:output_state(current_character) -- will only fire when logging is enabled.
                 core:trigger_event("RecruiterManagerGroupCountUpdated", cm:get_character_by_cqi(rm:current_character():command_queue_index()))
@@ -113,7 +122,6 @@ cm:add_first_tick_callback(function()
                 cm:callback( function() -- we callback this because if we don't do it on a small delay, it will pick up the unit we just cancelled as existing!
                     --we want to re-evaluate the units who were previously in queue, they may have changed.
                     local queue_counts = current_character:get_queue_counts() 
-                    rm:check_all_units_on_character(current_character)
                     rm:enforce_all_units_on_current_character()
                     rm:output_state(current_character)
                     core:trigger_event("RecruiterManagerGroupCountUpdated", cm:get_character_by_cqi(rm:current_character():command_queue_index()))
@@ -122,7 +130,7 @@ cm:add_first_tick_callback(function()
         end
     end,
     true);
-    --add queued mercenary listener
+    --add queued mercenary clicked listener
     core:add_listener(
     "RecruiterManagerOnQueuedMercenaryClicked",
     "ComponentLClickUp",
@@ -142,7 +150,6 @@ cm:add_first_tick_callback(function()
                 return --no mercenary at this position, do nothing
             end
             rm:log("Queued Mercenary name to be removed is: "..unitID)
-            rm:check_individual_unit_on_character(unitID, current_character)
             rm:enforce_unit_and_grouped_units(unitID, rm:current_character())
             rm:output_state(current_character) -- will only fire when logging is enabled.
             core:trigger_event("RecruiterManagerGroupCountUpdated", cm:get_character_by_cqi(rm:current_character():command_queue_index()))
@@ -199,9 +206,10 @@ cm:add_first_tick_callback(function()
         local char_cqi = unit:force_commander():command_queue_index();
         rm:log("Player faction recruited a unit!")
         local rec_char = rm:get_character_by_cqi(char_cqi)
-        rec_char:set_army_stale()
         rec_char:clear_mercenary_queue(false)
         rm:get_character_by_cqi(char_cqi):set_queue_stale()
+        rec_char:add_unit_to_army(unit:unit_key())
+        core:trigger_event("RecruiterManagerGroupCountUpdated", cm:get_character_by_cqi(rm:current_character():command_queue_index()))
     end,
     true)
 
@@ -220,13 +228,18 @@ cm:add_first_tick_callback(function()
             local current_character, was_created = rm:set_current_character(character:command_queue_index()) 
             cm:callback(function()
                 if was_created then
-                    rm:check_all_units_on_character(current_character)
+                    --rm:check_all_units_on_character(current_character)
+                    rm:enforce_all_units_on_current_character()
+                elseif current_character:is_queue_stale() or current_character:is_army_stale() then
+                    --rm:check_all_units_on_character(current_character)
                     rm:enforce_all_units_on_current_character()
                 end
                 core:trigger_event("RecruiterManagerGroupCountUpdated", cm:get_character_by_cqi(rm:current_character():command_queue_index()))
             end, 0.1)
         end,
         true)
+    
+
     --add recruit panel open listener
     core:add_listener(
         "RecruiterManagerOnRecruitPanelOpened",
@@ -256,7 +269,7 @@ cm:add_first_tick_callback(function()
                         end
                     end
                 end
-                rm:check_all_ui_recruitment_options(current_character, rec_opt)
+               -- rm:check_all_ui_recruitment_options(current_character, rec_opt)
                 rm:enforce_units_by_table(rec_opt, current_character)
                 core:trigger_event("RecruiterManagerGroupCountUpdated", cm:get_character_by_cqi(rm:current_character():command_queue_index()))
                 rm:output_state(rm:current_character())
@@ -264,25 +277,6 @@ cm:add_first_tick_callback(function()
         end,
         true
     )
-
-    --multiplayer safe listener
-    core:add_listener(
-        "UITriggerScriptEventRecruiterManager",
-        "UITriggerScriptEvent",
-        function(context)
-            return context:trigger():starts_with("recruiter_manager|force_stance|")
-        end,
-        function(context)
-            local trigger = context:trigger() --:string
-            local cqi = trigger:gsub("recruiter_manager|force_stance|", "")
-            --# assume cqi: CA_CQI
-            if not (cm:get_character_by_cqi(cqi):military_force():active_stance() == "MILITARY_FORCE_ACTIVE_STANCE_TYPE_SETTLE") then
-                cm:force_character_force_into_stance(cm:char_lookup_str(cqi), "MILITARY_FORCE_ACTIVE_STANCE_TYPE_SETTLE")
-            end
-        end,
-        true
-    )
-    --stance return listener
 
     --add mercenary panel open listener
     core:add_listener(
@@ -302,7 +296,6 @@ cm:add_first_tick_callback(function()
                 for i = 0, recruitmentList:ChildCount() - 1 do	
                     local recruitmentOption = UIComponent(recruitmentList:Find(i)):Id();
                     local unitID = string.gsub(recruitmentOption, "_mercenary", "")
-                    record = rm:check_individual_unit_on_character(unitID, current_character, record)
                     rm:enforce_ui_restriction_on_unit(rm:get_unit(unitID))
                 end
                 rm:output_state(rm:current_character())
@@ -325,8 +318,6 @@ cm:add_first_tick_callback(function()
         true
     )
 
-
-
     --add disbanded listener
     core:add_listener(
         "RecruiterManagerUnitDisbanded",
@@ -341,9 +332,11 @@ cm:add_first_tick_callback(function()
             --remove the unit from the army
             rm:get_character_by_cqi(unit:force_commander():command_queue_index()):remove_unit_from_army(unit:unit_key())
             --check the unit (+groups) again.
-            rm:check_individual_unit_on_character(unit:unit_key(), rm:current_character())
-            rm:enforce_all_units_on_current_character()
-            rm:output_state(rm:current_character())
+            cm:callback(function()
+                rm:enforce_all_units_on_current_character()
+                rm:output_state(rm:current_character())
+                core:trigger_event("RecruiterManagerGroupCountUpdated", cm:get_character_by_cqi(rm:current_character():command_queue_index()))
+            end, 0.1)
         end,
         true);
     --add merged listener
@@ -354,15 +347,15 @@ cm:add_first_tick_callback(function()
             return context:new_unit():faction():is_human() and rm:has_character(context:new_unit():force_commander():command_queue_index())
         end,
         function(context)
+            rm:log("PATH START Human character merged a unit")
             local unit = context:new_unit():unit_key() --:string
             local cqi = context:new_unit():force_commander():command_queue_index() --:CA_CQI
-            --there is a lot of possibilies when a merge has happened
-            --to be safe, we just set the army stale. 
-            rm:get_character_by_cqi(cqi):set_army_stale()
+            rm:get_character_by_cqi(cqi):remove_unit_from_army(unit)
             cm:remove_callback("RMMergeDestroy")
             cm:callback(function()
-                rm:check_all_units_on_character(rm:get_character_by_cqi(cqi))
+                rm:enforce_all_units_on_current_character()
                 rm:output_state(rm:current_character())
+                core:trigger_event("RecruiterManagerGroupCountUpdated", cm:get_character_by_cqi(rm:current_character():command_queue_index()))
             end, 0.2, "RMMergeDestroy")
         end,
         true)
@@ -462,7 +455,7 @@ end
 local function check_individual_army_validity(army_count, rec_char)
     local groups = {} --:map<string, number>
     for unit, count in pairs(army_count) do 
-       local rec_unit = rm:get_unit(unit, rec_char)
+       local rec_unit = rec_char:get_unit(unit)
        for groupID, _ in pairs(rec_unit:groups()) do
             groups[groupID] = (groups[groupID] or 0) + (rec_unit:weight() * count)
        end
@@ -596,8 +589,8 @@ cm:add_first_tick_callback(function()
                 rm:get_character_by_cqi(cqi):set_army_stale()
                 core:trigger_event("RecruiterManagerGroupCountUpdated", cm:get_character_by_cqi(rm:current_character():command_queue_index()))
             end
+            CampaignUI.ClearSelection()
         end,
         true
     )
-    CampaignUI.ClearSelection()
 end)

@@ -19,9 +19,7 @@ Enforcement
 --# assume debug.getinfo: function(WHATEVER) --> map<string, string>
 
 
-if __game_mode ~= __lib_type_campaign then
-	--return
-end
+
 
 --Log script to text
 --v function(text: WHATEVER)
@@ -206,6 +204,14 @@ local function fill_loc(loc, ...)
     return output
 end
 
+--v [NO_CHECK] function(txt: string) --> string
+local function getnumbersfromtext(txt)
+    local str = "" --:string
+    string.gsub(txt,"%d+",function(e)
+     str = str .. e
+    end)
+    return str
+end
 
 
 
@@ -414,12 +420,54 @@ function recruiter_manager.get_path_set(self, pathID)
     return self._UIPaths[pathID]
 end
 
+-----------------------
+----RECRUITER UNITS----
+-----------------------
+--TODO import
+cm:load_global_script("recruiter_unit")
+--# assume recruiter_unit.create_record: function( manager: RECRUITER_MANAGER, main_unit_key: string, base_unit: RECRUITER_UNIT?) --> RECRUITER_UNIT
+
+
+--------------------------
+----SUBOBJECT HANDLERS----
+--------------------------
+
+
+--v function(self: RECRUITER_MANAGER) --> map<string, RECRUITER_UNIT>
+function recruiter_manager.units(self)
+    return self._recruiterUnits
+end
+
+
+--v function(self: RECRUITER_MANAGER, unitID: string) --> RECRUITER_UNIT
+function recruiter_manager.new_unit(self, unitID)
+    if not is_string(unitID) then
+        self:log("Asked new unit to return a non string key: ["..tostring(unitID).."] ")
+        return nil
+    end
+    local new_unit = recruiter_unit.create_record(self, unitID)
+    self._recruiterUnits[unitID] = new_unit
+    return new_unit
+end
+
+
+--v function(self: RECRUITER_MANAGER, unitID: string) --> RECRUITER_UNIT
+function recruiter_manager.get_unit(self, unitID)
+    if self._recruiterUnits[unitID] then
+        return self._recruiterUnits[unitID]
+    else
+        return self:new_unit(unitID)
+    end
+end
+
 ---------------------------
 ----RECRUITER CHARACTER----
 ---------------------------
 --TODO import
 cm:load_global_script("recruiter_character")
 --# assume recruiter_character.new: function(manager: RECRUITER_MANAGER, cqi: CA_CQI) --> RECRUITER_CHARACTER
+
+
 
 --------------------------
 ----SUBOBJECT HANDLERS----
@@ -494,49 +542,9 @@ function recruiter_manager.set_current_character(self, cqi)
     end
 end
 
------------------------
-----RECRUITER UNITS----
------------------------
---TODO import
-cm:load_global_script("recruiter_unit")
---# assume recruiter_unit.create_record: function( manager: RECRUITER_MANAGER, main_unit_key: string, base_unit: RECRUITER_UNIT?) --> RECRUITER_UNIT
---------------------------
-----SUBOBJECT HANDLERS----
---------------------------
 
 
 
---v function(self: RECRUITER_MANAGER) --> map<string, RECRUITER_UNIT>
-function recruiter_manager.units(self)
-    return self._recruiterUnits
-end
-
-
---v function(self: RECRUITER_MANAGER, unitID: string) --> RECRUITER_UNIT
-function recruiter_manager.new_unit(self, unitID)
-    if not is_string(unitID) then
-        self:log("Asked new unit to return a non string key: ["..tostring(unitID).."] ")
-        return nil
-    end
-    local new_unit = recruiter_unit.create_record(self, unitID)
-    self._recruiterUnits[unitID] = new_unit
-    return new_unit
-end
-
---v function(self: RECRUITER_MANAGER, unitID: string, rec_char: RECRUITER_CHARACTER?) --> RECRUITER_UNIT
-function recruiter_manager.get_unit(self, unitID, rec_char)
-    if rec_char then -- if we are passed a rec char, check if they have an owned unit.
-        --# assume rec_char: RECRUITER_CHARACTER!
-        if rec_char:has_own_unit(unitID) then
-            return rec_char:get_owned_unit(unitID)
-        end
-    end
-    if self._recruiterUnits[unitID] then
-        return self._recruiterUnits[unitID]
-    else
-        return self:new_unit(unitID)
-    end
-end
 
 --------------------------------------------------
 -----------LOGGING OUTPUT FOR SUBOJBECTS----------
@@ -557,8 +565,8 @@ function recruiter_manager.output_state(self, rec_char)
         dumpstring = dumpstring .. unitID .. ": "..tostring(quantity) .. "\n\t\t"
     end
     dumpstring = string.sub(dumpstring, 1, dumpstring:len() - 1) .. "Mercs:\n\t\t"
-    for i, unitID in ipairs(rec_char._mercenaryQueue) do
-        dumpstring = dumpstring .. unitID .. "@ "..tostring(i) .. "\n\t\t"
+    for i, rec_unit in ipairs(rec_char._mercenaryQueue) do
+        dumpstring = dumpstring .. rec_unit:key() .. "@ "..tostring(i) .. "\n\t\t"
     end
     dumpstring = string.sub(dumpstring, 1, dumpstring:len() - 1) .. "Limits:\n\t\t"
     for groupID, quantity in pairs(rec_char._groupCounts) do
@@ -570,10 +578,11 @@ function recruiter_manager.output_state(self, rec_char)
         for groupID, _ in pairs(rec_unit:groups()) do
             dumpstring = dumpstring .. groupID .. ","
         end
+        dumpstring = dumpstring .. "\n\t\t"
     end
-    dumpstring = string.sub(dumpstring, 1, dumpstring:len() - 1) .. "Restriction Table:\n\t\t"
+    dumpstring = string.sub(dumpstring, 1, dumpstring:len() - 1) .. "Restriction Table:\n\t\t\t"
     for unitID, restricted in pairs(rec_char._restrictedUnits) do
-        dumpstring = dumpstring .. unitID .. ": ["..tostring(restricted) .. "] \""..rec_char:get_unit_lock_string(unitID).."\"\n\t\t"
+        dumpstring = dumpstring .. unitID .. ": ["..tostring(restricted) .. "] \n\t\t\t"
     end
     self:log(dumpstring)
 end
@@ -588,7 +597,12 @@ end
 --get the weight of a specific unit
 --v function(self: RECRUITER_MANAGER, unitID: string, rec_char: RECRUITER_CHARACTER?) --> number
 function recruiter_manager.get_weight_for_unit(self, unitID, rec_char)
-    return self:get_unit(unitID, rec_char):weight()
+    if rec_char then
+        --# assume rec_char: RECRUITER_CHARACTER
+       return rec_char:get_unit(unitID):weight()
+    else
+        return self:get_unit(unitID):weight()
+    end
 end
 
 --set the weight for a unit within their groups.
@@ -674,257 +688,66 @@ end
 
 
 
-------------------------
-----CALLS FOR CHECKS----
-------------------------
-
-
-
---v function(self: RECRUITER_MANAGER, unitID: string, rec_char: RECRUITER_CHARACTER, process_record: map<string, boolean>?) --> map<string, boolean>
-function recruiter_manager.check_individual_unit_on_character(self, unitID,rec_char, process_record)
-    --localisations
-    local loc_points = effect.get_localised_string("ttc_measurement_name")
-    local loc_restriction = effect.get_localised_string("ttc_restriction_tooltip")
-    if not process_record then
-        process_record = {}
-    end
-    --# assume process_record: map<string, boolean>
-    --first, get the unit
-    local unit = self:get_unit(unitID, rec_char)
-    --TODO implement single unit restrictions if necessary.
-    --Group Checks
-    if has_unchecked_group(unit, process_record) then
-    --for each groupID the unit has
-        for groupID, _ in pairs(unit:groups()) do --in most cases, there will be only one applicable group.
-        
-            --reset the character's group count for this group
-            local count = 0 --:number
-            --for each unit in the group,
-            local grouped_units = self:get_units_in_group(groupID)
-            for i = 1, #grouped_units do
-                --get our actual unit, we can process through a vector now!
-                local grouped_unit = self:get_unit(grouped_units[i], rec_char)
-                --make sure our actual unit is part of this group 
-                --(For example, queueing a special unit on skrolk will put plague monks here! This check will see that plague monks don't have that group!)
-                if grouped_unit:has_group(groupID) then
-                    count = count + (rec_char:get_unit_count(grouped_unit:key()) * grouped_unit:weight())
-                end
-            end
-            rec_char:cache_group_counts_on_character(groupID, count)
-            process_record[groupID] = true
-        end
-    end
-    local did_restrict = false --:boolean
-    for groupID, _ in pairs(process_record) do    
-        local grouped_units = self:get_units_in_group(groupID)
-        local restriction_quantity = rec_char:get_quantity_limit_for_group(groupID)
-        for i = 1, #grouped_units do
-            local grouped_unit = self:get_unit(grouped_units[i], rec_char)
-            --wait! We need to make sure this unit is actually in this group for this specific character!
-            --otherwise we'll fuck up the other groups' restrictions!
-            if grouped_unit:has_group(groupID) then
-                local group_count = rec_char:get_group_counts_on_character(groupID)
-                local weight = grouped_unit:weight()
-                local should_restrict = group_count + weight > restriction_quantity
-                if should_restrict then
-                    did_restrict = true
-                end
-                if should_restrict or (not did_restrict) then
-                    --if we should restrict, add a reason. 
-                    --If we have already restricted, and this is false, then we don't want to cancel that valid restriction.
-                    local restriction_text = fill_loc(loc_restriction, tostring(weight), self:get_ui_name_for_group(groupID), loc_points, tostring(restriction_quantity - group_count), loc_points)
-                    rec_char:set_unit_restriction(grouped_unit:key(),
-                        should_restrict,
-                        restriction_text
-                    )
-                end
-            end
-        end
-    end
-    return process_record
-end
-
---v function(self: RECRUITER_MANAGER, rec_char: RECRUITER_CHARACTER, ui_option_table: map<string, boolean>, process_record: map<string, boolean>?) --> map<string, boolean>
-function recruiter_manager.check_all_ui_recruitment_options(self, rec_char, ui_option_table, process_record)
-    if not process_record then
-        process_record = {}
-    end
-    --localisations
-    local loc_points = effect.get_localised_string("ttc_measurement_name")
-    local loc_restriction = effect.get_localised_string("ttc_restriction_tooltip")
-    --# assume process_record: map<string, boolean>
-    for unitID, _ in pairs(ui_option_table) do
-        --first, get the unit
-        local unit = self:get_unit(unitID, rec_char)
-        --TODO implement single unit restrictions if necessary.
-        --Group Checks
-        if has_unchecked_group(unit, process_record) then
-            --for each groupID the unit has
-            for groupID, _ in pairs(unit:groups()) do --in most cases, there will be only one applicable group.
-                --reset the character's group count for this group
-                local count = 0 --:number
-                --for each unit in the group,
-                local grouped_units = self:get_units_in_group(groupID)
-                for i = 1, #grouped_units do
-                    --get our actual unit, we can process through a vector now!
-                    local grouped_unit = self:get_unit(grouped_units[i], rec_char)
-                    --make sure our actual unit is part of this group 
-                    --(For example, queueing a special unit on skrolk will put plague monks here! This check will see that plague monks don't have that group!)
-                    if grouped_unit:has_group(groupID) then
-                        count = count + (rec_char:get_unit_count(grouped_unit:key()) * grouped_unit:weight())
-                    end
-                end
-                rec_char:cache_group_counts_on_character(groupID, count)
-                process_record[groupID] = true --this group has been processed!
-            end
-        end
-    end
-    local did_restrict = false --:boolean
-    for groupID, _ in pairs(process_record) do    
-        local grouped_units = self:get_units_in_group(groupID)
-        local restriction_quantity = rec_char:get_quantity_limit_for_group(groupID)
-        for i = 1, #grouped_units do
-            local grouped_unit = self:get_unit(grouped_units[i], rec_char)
-            --wait! We need to make sure this unit is actually in this group for this specific character!
-            --otherwise we'll fuck up the other groups' restrictions!
-            if grouped_unit:has_group(groupID) then
-                local group_count = rec_char:get_group_counts_on_character(groupID)
-                local weight = grouped_unit:weight()
-                local should_restrict = group_count + weight > restriction_quantity
-                if should_restrict then
-                    did_restrict = true
-                end
-                if should_restrict or (not did_restrict) then
-                    --if we should restrict, add a reason. 
-                    --If we have already restricted, and this is false, then we don't want to cancel that valid restriction.
-                    local restriction_text = fill_loc(loc_restriction, tostring(weight), self:get_ui_name_for_group(groupID), loc_points, tostring(restriction_quantity - group_count), loc_points)
-                    rec_char:set_unit_restriction(grouped_unit:key(),
-                        should_restrict,
-                        restriction_text
-                    )
-                end
-            end
-        end
-    end
-    return process_record
-end
-
---v function(self: RECRUITER_MANAGER, rec_char: RECRUITER_CHARACTER, ui_option_table: map<string, boolean>?)
-function recruiter_manager.check_all_units_on_character(self, rec_char, ui_option_table)
-    local process_record = {} --:map<string, boolean>
-    if rec_char:is_army_stale() then
-        rec_char:refresh_army()
-    end
-    local character_units = rec_char:get_army_counts()
-    local character_queue --:map<string, number>
-    if rec_char._isHuman and (rec_char:is_queue_stale() == false) then
-        character_queue = rec_char:get_queue_counts()
-    elseif rec_char._isHuman then
-        rec_char:refresh_queue()
-        character_queue = rec_char:get_queue_counts()
-    else
-        character_queue = {}
-    end
-
-    for unitID, _ in pairs(character_units) do
-        process_record = self:check_individual_unit_on_character(unitID, rec_char, process_record)
-    end
-    for unitID, _ in pairs(character_queue) do
-        process_record = self:check_individual_unit_on_character(unitID, rec_char, process_record)
-    end
-    if ui_option_table and is_table(ui_option_table) then
-        --# assume ui_option_table: map<string, boolean>
-        process_record = self:check_all_ui_recruitment_options(rec_char, ui_option_table, process_record)
-    end
-end
-
-
---v function(self: RECRUITER_MANAGER, unitID: string, rec_char: RECRUITER_CHARACTER, is_mercenary: boolean?)
-function recruiter_manager.remove_unit_from_character_queue_and_refresh_limits(self, unitID, rec_char, is_mercenary)
-    --localisations
-    local loc_points = effect.get_localised_string("ttc_measurement_name")
-    local loc_restriction = effect.get_localised_string("ttc_restriction_tooltip")
-    --get the real unit record
-    local rec_unit = self:get_unit(unitID, rec_char)
-    --reduce the count of the queue for that unit!
-    local ok = is_mercenary or rec_char:remove_unit_from_queue(unitID)
-    if ok then
-        local did_restrict = false --:boolean
-        for groupID, _ in pairs(rec_unit:groups()) do
-            local current_count = rec_char:get_group_counts_on_character(groupID)
-            local new_count = current_count - rec_unit:weight()
-            if new_count < 0 then
-                -- I don't really know what causes these to go negative but --TODO figure this out. 
-                rec_char:set_queue_stale()
-                new_count = 0
-            end
-            rec_char:cache_group_counts_on_character(groupID, new_count)
-            local grouped_units = self:get_units_in_group(groupID)
-            local restriction_quantity = rec_char:get_quantity_limit_for_group(groupID)
-            for i = 1, #grouped_units do
-                local grouped_unit = self:get_unit(grouped_units[i], rec_char)
-                if grouped_unit:has_group(groupID) then
-                    local weight = grouped_unit:weight()
-                    local should_restrict = new_count + weight > restriction_quantity
-                    local was_restricted = current_count + weight > restriction_quantity
-                    if should_restrict and grouped_unit:key() == unitID then
-                        did_restrict = true
-                    end
-                    if should_restrict or ((was_restricted and (not should_restrict)) 
-                    and grouped_unit:key() == unitID and (not did_restrict)) then
-                        local restriction_text = fill_loc(loc_restriction, tostring(weight), self:get_ui_name_for_group(groupID), loc_points, tostring(restriction_quantity - new_count), loc_points)
-                        rec_char:set_unit_restriction(grouped_unit:key(),
-                            should_restrict,
-                            restriction_text
-                        )
-                    end
-                end
-            end
-        end
-    end
-end
-
---v function(self: RECRUITER_MANAGER, unitID: string, rec_char: RECRUITER_CHARACTER, is_mercenary: boolean?)
-function recruiter_manager.add_unit_to_character_queue_and_refresh_limits(self, unitID, rec_char, is_mercenary)
-    --localisations
-    local loc_points = effect.get_localised_string("ttc_measurement_name")
-    local loc_restriction = effect.get_localised_string("ttc_restriction_tooltip")
-    local rec_unit = self:get_unit(unitID, rec_char) 
-    if is_mercenary then
-        rec_char:queue_mercenary(unitID)
-    else
-        rec_char:add_unit_to_queue(unitID)
-    end
-    for groupID, _ in pairs(rec_unit:groups()) do
-        local current_count = rec_char:get_group_counts_on_character(groupID)
-        local new_count = current_count+rec_unit:weight()
-        rec_char:cache_group_counts_on_character(groupID, new_count)
-        local grouped_units = self:get_units_in_group(groupID)
-        local restriction_quantity = rec_char:get_quantity_limit_for_group(groupID)
-        for i = 1, #grouped_units do
-            local grouped_unit = self:get_unit(grouped_units[i], rec_char)
-            if grouped_unit:has_group(groupID) then
-                local weight = grouped_unit:weight()
-                local should_restrict = new_count + weight > restriction_quantity
-                if should_restrict then
-                    did_restrict = true
-                end
-                if should_restrict or (not did_restrict) then
-                    local restriction_text = fill_loc(loc_restriction, tostring(weight), self:get_ui_name_for_group(groupID), loc_points, tostring(restriction_quantity - new_count), loc_points)
-                    rec_char:set_unit_restriction(grouped_unit:key(),
-                        should_restrict,
-                        restriction_text
-                    )
-                end
-            end
-        end
-    end
-end
 
 -----------------------
 ------ENFORCEMENT------
 -----------------------
 
+--v function(self: RECRUITER_MANAGER, unitID: string, unitCard: CA_UIC, rec_char: RECRUITER_CHARACTER)
+function recruiter_manager.enforce_caps_on_unit_uic(self, unitID, unitCard, rec_char)
+    local loc_points = effect.get_localised_string("ttc_measurement_name")
+    local loc_restriction = effect.get_localised_string("ttc_restriction_tooltip")
+
+    local rec_unit = rec_char:get_unit(unitID)
+    local is_restricted, restricted_groups = rec_char:is_unit_restricted(rec_unit)
+    local restriction_text = ""
+
+    if is_restricted then
+        for k = 1, #restricted_groups do
+            local groupID = restricted_groups[k].group
+            local limit = restricted_groups[k].limit
+            local quantity = restricted_groups[k].quantity
+            restriction_text = restriction_text.. fill_loc(loc_restriction, tostring(rec_unit:weight()), self:get_ui_name_for_group(groupID), loc_points, tostring(limit - quantity), loc_points)
+        end
+    end
+    self:log("Enforcing restrictions for Unit["..unitID.."] Restriction["..tostring(is_restricted).."] Character["..tostring(self._UICurrentCharacter).."] on player UI!")
+    --if the unit is restricted, then
+
+    if is_restricted and not unitCard:GetTooltipText():find("col:red") then
+        self:log("Locking Unit ["..unitID.."]")
+        unitCard:SetInteractive(false)
+        local lockedOverlay = find_uicomponent(unitCard, "disabled_script");
+        if not not lockedOverlay then
+            lockedOverlay:SetVisible(true)
+            lockedOverlay:SetImagePath("ui/custom/recruitment_controls/locked_unit.png")
+            lockedOverlay:SetTooltipText(restriction_text, true)
+            lockedOverlay:SetCanResizeHeight(true)
+            lockedOverlay:SetCanResizeWidth(true)
+            lockedOverlay:Resize(72, 89)
+            lockedOverlay:SetCanResizeHeight(false)
+            lockedOverlay:SetCanResizeWidth(false)
+        end
+    else
+    --otherwise, set the card clickable
+        self:log("Unlocking! Unit ["..unitID.."]")
+        unitCard:SetInteractive(true)
+        local lockedOverlay = find_uicomponent(unitCard, "disabled_script");
+        if not not lockedOverlay then
+            if rec_unit._UIPip then
+                lockedOverlay:SetVisible(true)
+                lockedOverlay:SetTooltipText(rec_unit._UIText, true)
+                lockedOverlay:SetImagePath(rec_unit._UIPip)
+                lockedOverlay:SetCanResizeHeight(true)
+                lockedOverlay:SetCanResizeWidth(true)
+                lockedOverlay:Resize(30, 30)
+                lockedOverlay:SetCanResizeHeight(false)
+                lockedOverlay:SetCanResizeWidth(false)
+            else
+                lockedOverlay:SetVisible(false)
+            end
+        end
+    end
+end
 
 --applies the restrictions stored in the currently selected rec character to the UI directly.
 --v function(self: RECRUITER_MANAGER, rec_unit: RECRUITER_UNIT)
@@ -944,7 +767,7 @@ function recruiter_manager.enforce_ui_restriction_on_unit(self, rec_unit)
         return
     end
     local unitID = rec_unit._key
-    self:log("Enforcing restrictions for Unit["..unitID.."] Restriction["..tostring(rec_char:is_unit_restricted(unitID)).."] Character["..tostring(self._UICurrentCharacter).."] on player UI!")
+    
     --check if merc is open
     local path_to_mercs = pathset:mercenary_path()
     local mercenaryRecruitmentList = find_uicomponent_from_table(core:get_ui_root(), path_to_mercs);
@@ -957,56 +780,7 @@ function recruiter_manager.enforce_ui_restriction_on_unit(self, rec_unit)
         local unitCard = find_uicomponent(mercenaryRecruitmentList, unit_component_ID)
         --if we got the unit card, proceed
         if is_uicomponent(unitCard) then
-            --first, check if the unit is supposed to be visible.
-            --[[if rec_char:is_unit_hidden(unitID) then
-                self:log("Setting unit card ["..unit_component_ID.."] hidden")
-                if unitCard:Visible() then
-                    unitCard:SetVisible(false)
-                end
-            --else --otherwise, care about locking it.]]
-                --self:log("Setting unit card ["..unit_component_ID.."] invisible")
-                if not unitCard:Visible() then
-                    unitCard:SetVisible(true)
-                end
-                --if the unit is restricted, then
-                if rec_char:is_unit_restricted(unitID) == true and not unitCard:GetTooltipText():find("col:red") then
-                    self:log("Locking Unit Card ["..unit_component_ID.."]")
-                    unitCard:SetInteractive(false)
-                    -- unitCard:SetVisible(false)
-                    local lockedOverlay = find_uicomponent(unitCard, "disabled_script");
-                    if not not lockedOverlay then
-                        lockedOverlay:SetVisible(true)
-                        lockedOverlay:SetImagePath("ui/custom/recruitment_controls/locked_unit.png")
-                        lockedOverlay:SetTooltipText(rec_char:get_unit_lock_string(unitID), true)
-                        lockedOverlay:SetCanResizeHeight(true)
-                        lockedOverlay:SetCanResizeWidth(true)
-                        lockedOverlay:Resize(72, 89)
-                        lockedOverlay:SetCanResizeHeight(false)
-                        lockedOverlay:SetCanResizeWidth(false)
-                    end
-                    --unitCard:SetVisible(false)
-                else
-                --otherwise, set the card clickable
-                    self:log("Unlocking! Unit Card ["..unit_component_ID.."]")
-                    unitCard:SetInteractive(true)
-                    -- unitCard:SetVisible(true)
-                    local lockedOverlay = find_uicomponent(unitCard, "disabled_script");
-                    if not not lockedOverlay then
-                        if rec_unit._UIPip then
-                            lockedOverlay:SetVisible(true)
-                            lockedOverlay:SetTooltipText(rec_unit._UIText, true)
-                            lockedOverlay:SetImagePath(rec_unit._UIPip)
-                            lockedOverlay:SetCanResizeHeight(true)
-                            lockedOverlay:SetCanResizeWidth(true)
-                            lockedOverlay:Resize(30, 30)
-                            lockedOverlay:SetCanResizeHeight(false)
-                            lockedOverlay:SetCanResizeWidth(false)
-                        else
-                            lockedOverlay:SetVisible(false)
-                        end
-                    end
-                end
-            --end
+            self:enforce_caps_on_unit_uic(unitID, unitCard, rec_char)
         else 
             --do nothing
         end
@@ -1025,55 +799,7 @@ function recruiter_manager.enforce_ui_restriction_on_unit(self, rec_unit)
             --if we got the unit card, proceed
             if is_uicomponent(unitCard) then
                 --first, check if the unit is supposed to be visible.
-                if rec_char:is_unit_hidden(unitID) then
-                    self:log("Setting unit card ["..unit_component_ID.."] hidden")
-                    if unitCard:Visible() then
-                        unitCard:SetVisible(false)
-                    end
-                else --otherwise, care about locking it.
-                    if not unitCard:Visible() then
-                        self:log("Setting unit card ["..unit_component_ID.."] visible")
-                        unitCard:SetVisible(true)
-                    end
-                    --if the unit is restricted, set the card to be unclickable.
-                    if rec_char:is_unit_restricted(unitID) == true and not unitCard:GetTooltipText():find("col:red") then
-                        self:log("Locking Unit Card ["..unit_component_ID.."]")
-                        unitCard:SetInteractive(false)
-                        -- unitCard:SetVisible(false)
-                        local lockedOverlay = find_uicomponent(unitCard, "disabled_script");
-                        if not not lockedOverlay then
-                            lockedOverlay:SetVisible(true)
-                            lockedOverlay:SetImagePath("ui/custom/recruitment_controls/locked_unit.png")
-                            lockedOverlay:SetTooltipText(rec_char:get_unit_lock_string(unitID), true)
-                            lockedOverlay:SetCanResizeHeight(true)
-                            lockedOverlay:SetCanResizeWidth(true)
-                            lockedOverlay:Resize(72, 89)
-                            lockedOverlay:SetCanResizeHeight(false)
-                            lockedOverlay:SetCanResizeWidth(false)
-                        end
-                        --unitCard:SetVisible(false)
-                    else
-                    --otherwise, set the card clickable
-                        self:log("Unlocking! Unit Card ["..unit_component_ID.."]")
-                        unitCard:SetInteractive(true)
-                        -- unitCard:SetVisible(true)
-                        local lockedOverlay = find_uicomponent(unitCard, "disabled_script");
-                        if not not lockedOverlay then
-                            if rec_unit._UIPip then
-                                lockedOverlay:SetVisible(true)
-                                lockedOverlay:SetTooltipText(rec_unit._UIText, true)
-                                lockedOverlay:SetImagePath(rec_unit._UIPip)
-                                lockedOverlay:SetCanResizeHeight(true)
-                                lockedOverlay:SetCanResizeWidth(true)
-                                lockedOverlay:Resize(30, 30)
-                                lockedOverlay:SetCanResizeHeight(false)
-                                lockedOverlay:SetCanResizeWidth(false)
-                            else
-                                lockedOverlay:SetVisible(false)
-                            end
-                        end
-                    end
-                end
+                self:enforce_caps_on_unit_uic(unitID, unitCard, rec_char)
             else 
                 --do nothing
             end
@@ -1090,40 +816,68 @@ function recruiter_manager.enforce_all_units_on_current_character(self)
         cm:steal_user_input(false);
         return
     end
-    local char = self:get_character_by_cqi(self._UICurrentCharacter)
-    local char_restricted_units = char._restrictedUnits
-    local char_hidden_units = char._hiddenUnits
-    for unit_key, restricted in pairs(char_restricted_units) do
-        self:enforce_ui_restriction_on_unit(self:get_unit(unit_key, char))
+    local rec_char = self:get_character_by_cqi(self._UICurrentCharacter)
+    local char_army = rec_char._armyCounts
+    local char_queue = rec_char._queueCounts
+    for unit_key, restricted in pairs(char_army) do
+        self:enforce_ui_restriction_on_unit(rec_char:get_unit(unit_key))
     end
-    for unit_key, restricted in pairs(char_hidden_units) do
-        if char_restricted_units[unit_key] ~= nil then
-            self:enforce_ui_restriction_on_unit(self:get_unit(unit_key, char))
-        end
+    for unit_key, restricted in pairs(char_queue) do
+        self:enforce_ui_restriction_on_unit(rec_char:get_unit(unit_key))  
     end
 end
 
 --v function(self: RECRUITER_MANAGER, ui_table: map<string, boolean>, rec_char: RECRUITER_CHARACTER)
 function recruiter_manager.enforce_units_by_table(self, ui_table, rec_char)
     for unit_key, _ in pairs(ui_table) do
-        self:enforce_ui_restriction_on_unit(self:get_unit(unit_key, rec_char))
+        self:enforce_ui_restriction_on_unit(rec_char:get_unit(unit_key))
     end
 end
 
 --v function(self: RECRUITER_MANAGER, unitID: string, rec_char: RECRUITER_CHARACTER)
 function recruiter_manager.enforce_unit_and_grouped_units(self, unitID, rec_char)
-    local unit = self:get_unit(unitID, rec_char)
+    local unit = rec_char:get_unit(unitID)
     self:enforce_ui_restriction_on_unit(unit)
     for groupID, _ in pairs(unit:groups()) do
         local grouped_units = self:get_units_in_group(groupID)
         for i = 1, #grouped_units do 
             if (grouped_units[i] ~= unitID) then
-            local grouped_unit = self:get_unit(grouped_units[i], rec_char)
+            local grouped_unit = rec_char:get_unit(grouped_units[i])
             self:enforce_ui_restriction_on_unit(grouped_unit)
             end
         end
     end
 end
+
+---------------------
+----Unit Upgrades----
+---------------------
+
+--handlers for unit upgrade mechanics added by mods.
+--units trigger UnitDisbanded when destroyed through the UI. 
+--the grant_unit command is wrapped to pick up units added from script.
+--v function(self: RECRUITER_MANAGER, character_cqi: CA_CQI, unitID: string, upgradedUnitID: string) --> boolean
+function recruiter_manager.can_upgrade_unit_to_unit(self, character_cqi, unitID, upgradedUnitID)
+    --self:log("Evaluating whether ["..tostring(character_cqi).."] can upgrade ["..unitID.."] into ["..upgradedUnitID.."]")
+    --the mods which use this function tend to call it... often. Logs are commented out.
+    local exceeds_cap = false --:boolean
+    local rec_char = self:get_character_by_cqi(character_cqi)
+    local rec_unit = rec_char:get_unit(unitID)
+    local rec_unit_upgrade = rec_char:get_unit(upgradedUnitID)
+    local upgrade_weight = rec_unit_upgrade:weight()
+    for groupID, _ in pairs(rec_unit_upgrade:groups()) do
+        local current_count = rec_char:get_group_counts_on_character(groupID)
+        local limit = rec_char:get_quantity_limit_for_group(groupID)
+        if rec_unit:has_group(groupID) then
+            current_count = current_count - rec_unit:weight()
+        end
+        exceeds_cap = exceeds_cap or ((current_count + upgrade_weight) > limit)
+        --self:log("Upgraded unit has group ["..groupID.."] with weight ["..upgrade_weight.."], count was ["..current_count.."] after removing current unit, limit is ["..limit.."]")
+    end
+    --self:log("Upgrade is valid: "..tostring(not exceeds_cap))
+    return not exceeds_cap
+end
+
 
 
 ----------------------------
@@ -1177,24 +931,6 @@ end
 ------------------------
 ----UI UNIT PROFILES----
 ------------------------
-
---[[ --TODO this
---sets a UI text for a given unit
---v function(self: RECRUITER_MANAGER, unitID: string, UIText: string)
-function recruiter_manager.set_ui_text_for_unit(self, unitID, UIText)
-    if (not is_string(unitID)) then 
-        self:log("set_ui_text_for_unit called with bad arg #1, unitID must be a string!")
-    elseif (not is_string(UIText)) then
-        self:log("set_ui_text_for_unit called with bad arg #2, UIText must be a string!")
-    end
-    self:get_unit(unitID):set_ui_text_for_unit
-
-
-end--]]
-
-
-
-
 
 --set the UI profile for a unit.
 
@@ -1626,7 +1362,44 @@ if __game_mode == __lib_type_campaign then
         end,
         true
     )
+
+
     
+
+    --v function(cm: CM, char_string: string, unit_key: string) 
+    function new_grant_unit(cm, char_string, unit_key)
+        local ok, err = pcall(function()
+            if not is_string(char_string) then
+                script_error("ERROR: grant_unit_to_character() called but supplied value char_string [" .. tostring(char_string) .. "] is not a string")
+                return 
+            end
+            if not is_string(unit_key) then
+                script_error("ERROR: grant_unit_to_character() called but supplied value unit_key [" .. tostring(unit_key) .. "] is not a string")
+                return 
+            end
+            cm.game_interface:grant_unit_to_character(char_string, unit_key)    
+            if string.find(char_string, "cqi:") then
+                local cqi = tonumber(getnumbersfromtext(char_string)) --# assume cqi: CA_CQI
+                local character = cm:get_character_by_cqi(cqi)
+                if not character:is_null_interface() and character:faction():is_human() then
+                    rm:log("GRANT UNIT COMMAND: ".. char_string.." resolved to cqi "..tostring(cqi))
+                    local rec_char = rm:get_character_by_cqi(cqi)
+                    rec_char:add_unit_to_army(unit_key)
+                else
+                    rm:log("GRANT UNIT COMMAND: ".. char_string.." resolved to cqi "..tostring(cqi)..", but returned a null interface.")
+                end
+            else
+                rm:log("GRANT UNIT COMMAND: No CQI in char_string "..char_string)
+            end
+            return true
+        end)
+        if not ok then
+            rm:log("GRANT UNIT COMMAND FAILED")
+            rm:log("ERR MSG: "..tostring(err))
+        end
+    end
+    
+    cm.grant_unit_to_character = new_grant_unit
     cm:add_first_tick_callback(function()
         
         local groups = {} --:map<string, boolean>
