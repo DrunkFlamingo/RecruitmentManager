@@ -33,8 +33,7 @@ function recruiter_character.new(manager, cqi)
     --new 10/07/19
     --stores how much of each category is possessed.
     self._groupCounts = {} --:map<string, number>
-    --stores how much of each category is allowed.
-    self._groupMax = {} --:map<string, number>
+
 
     --new 10/15/19
     --stores the mercenary queue
@@ -77,17 +76,8 @@ function recruiter_character.log(self, text)
     self:manager():log(text)
 end
 
---get the army counts map
---v function(self: RECRUITER_CHARACTER) --> map<string, number>
-function recruiter_character.get_army_counts(self)
-    return self._armyCounts
-end
 
---get the queue counts map
---v function(self: RECRUITER_CHARACTER) --> map<string, number>
-function recruiter_character.get_queue_counts(self)
-    return self._queueCounts
-end
+
 
 --get the restricted units map
 --v function(self: RECRUITER_CHARACTER) --> map<string, boolean>
@@ -196,7 +186,7 @@ end
 function recruiter_character.wipe_queue(self)
     self:log("wiped Queue for ["..tostring(self:command_queue_index()).."] ")
     --loop through the queue, setting each unit entry to 0
-    for unit, _ in pairs(self:get_queue_counts()) do 
+    for unit, _ in pairs(self._queueCounts) do 
         self._queueCounts[unit] = 0
     end
     self._queueNum = 0
@@ -207,9 +197,8 @@ end
 function recruiter_character.wipe_army(self)
     self:log("wiped Army for ["..tostring(self:command_queue_index()).."] ")
     --loop through the army, setting each unit entry to 0
-    for unit, _ in pairs(self:get_army_counts()) do
-        self._armyCounts[unit] = 0 --note, tested performance using allocation to reset this
-        --its actually pretty much faster this way.
+    for unit, _ in pairs(self._armyCounts) do
+        self._armyCounts[unit] = 0 
     end
 end
 
@@ -371,13 +360,13 @@ function recruiter_character.get_unit_count_in_army(self, unitID)
         --if the unit hasn't been used yet, give it a default value.
         return 0
     end
-    return self:get_army_counts()[unitID]
+    return self._armyCounts[unitID]
 end
 
 --get the unit count from the queue of the character
 --v function(self:RECRUITER_CHARACTER, unitID: string) --> number
 function recruiter_character.get_unit_count_in_queue(self, unitID)
-    if self:get_queue_counts()[unitID] == nil then
+    if self._queueCounts[unitID] == nil then
         --if the unit hasn't been used yet, give it a default value.
         self._queueCounts[unitID] = 0
     end
@@ -386,7 +375,7 @@ function recruiter_character.get_unit_count_in_queue(self, unitID)
         self:log("get_unit_count_in_queue for called for ["..unitID.."] on character ["..tostring(self:command_queue_index()).."], but the queue is stale!")
         return 0 
     end
-    return self:get_queue_counts()[unitID]
+    return self._queueCounts[unitID]
 end
 
 --get a boolean whether you have a specific unit
@@ -440,6 +429,24 @@ function recruiter_character.get_mercenary_count(self, unitID)
     return ret
 end
 
+--get the army counts map
+--v function(self: RECRUITER_CHARACTER) --> map<string, number>
+function recruiter_character.get_army_counts(self)
+    if self:is_army_stale() then
+        self:refresh_army()
+    end
+    return self._armyCounts
+end
+
+
+--get the queue counts map
+--v function(self: RECRUITER_CHARACTER) --> map<string, number>
+function recruiter_character.get_queue_counts(self)
+    if self:is_queue_stale() then
+        self:refresh_queue()
+    end
+    return self._queueCounts
+end
 
 --checks for stale information, refreshes it, then returns the total count accross both queue and army
 --v function(self: RECRUITER_CHARACTER, unitID: string) --> number
@@ -473,12 +480,25 @@ function recruiter_character.set_unit_restriction(self, unitID, restricted, reas
     end
 end
 
+
+--v [NO_CHECK] function(self: RECRUITER_CHARACTER, groupID: string) --> number
+function recruiter_character.get_quantity_limit_for_group(self, groupID)
+    --for now, this just returns where the default value is stored in the model for all characters.
+    --in the future, this will allow me to insert code here to add or subtract capacity based on the character's subtype, traits, skills or effects.
+    --TODO Character cap increases or penalties
+    return self:manager():get_base_quantity_limit_for_group(groupID)
+end
+
+
 --return whether a unit is restricted for a character
---v function(self: RECRUITER_CHARACTER, unitID: string) --> boolean
-function recruiter_character.is_unit_restricted(self, unitID)
-    if self:manager():is_unit_faction_restricted(unitID, self._factionKey) then
-        return true
-    end
+--v function(self: RECRUITER_CHARACTER, rec_unit: RECRUITER_UNIT) --> boolean
+function recruiter_character.is_unit_restricted(self, rec_unit)
+    local unitID = rec_unit:key()
+    --[[local groups = self:manager()
+    for groupID, _ in pairs(rec_unit:groups()) do
+        local quantity = self._groupCounts[groupID] or 0
+        local limit = self:get_quantity_limit_for_group(groupID)
+    end--]]
     local unit_restrictions = self._restrictedUnits
     self:log("is unit restricted returning ["..tostring(not not unit_restrictions[unitID]).."] for unit ["..unitID.."]")
     return not not self._restrictedUnits[unitID]
@@ -497,17 +517,7 @@ function recruiter_character.is_unit_hidden(self, unitID)
     return not not self._hiddenUnits[unitID]
 end
 
--------------------------------------
------MAXIMUM QUANTITY VARIABLES------
--------------------------------------
 
---v [NO_CHECK] function(self: RECRUITER_CHARACTER, groupID: string) --> number
-function recruiter_character.get_quantity_limit_for_group(self, groupID)
-    --for now, this just returns where the default value is stored in the model for all characters.
-    --in the future, this will allow me to insert code here to add or subtract capacity based on the character's subtype, traits, skills or effects.
-    --TODO Character cap increases or penalties
-    return self:manager():get_base_quantity_limit_for_group(groupID)
-end
 
 
 -------------------------------------

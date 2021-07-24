@@ -19,9 +19,7 @@ Enforcement
 --# assume debug.getinfo: function(WHATEVER) --> map<string, string>
 
 
-if __game_mode ~= __lib_type_campaign then
-	--return
-end
+
 
 --Log script to text
 --v function(text: WHATEVER)
@@ -206,6 +204,14 @@ local function fill_loc(loc, ...)
     return output
 end
 
+--v [NO_CHECK] function(txt: string) --> string
+local function getnumbersfromtext(txt)
+    local str = "" --:string
+    string.gsub(txt,"%d+",function(e)
+     str = str .. e
+    end)
+    return str
+end
 
 
 
@@ -414,12 +420,22 @@ function recruiter_manager.get_path_set(self, pathID)
     return self._UIPaths[pathID]
 end
 
+-----------------------
+----RECRUITER UNITS----
+-----------------------
+--TODO import
+cm:load_global_script("recruiter_unit")
+--# assume recruiter_unit.create_record: function( manager: RECRUITER_MANAGER, main_unit_key: string, base_unit: RECRUITER_UNIT?) --> RECRUITER_UNIT
+
+
 ---------------------------
 ----RECRUITER CHARACTER----
 ---------------------------
 --TODO import
 cm:load_global_script("recruiter_character")
 --# assume recruiter_character.new: function(manager: RECRUITER_MANAGER, cqi: CA_CQI) --> RECRUITER_CHARACTER
+
+
 
 --------------------------
 ----SUBOBJECT HANDLERS----
@@ -494,16 +510,6 @@ function recruiter_manager.set_current_character(self, cqi)
     end
 end
 
------------------------
-----RECRUITER UNITS----
------------------------
---TODO import
-cm:load_global_script("recruiter_unit")
---# assume recruiter_unit.create_record: function( manager: RECRUITER_MANAGER, main_unit_key: string, base_unit: RECRUITER_UNIT?) --> RECRUITER_UNIT
---------------------------
-----SUBOBJECT HANDLERS----
---------------------------
-
 
 
 --v function(self: RECRUITER_MANAGER) --> map<string, RECRUITER_UNIT>
@@ -570,6 +576,7 @@ function recruiter_manager.output_state(self, rec_char)
         for groupID, _ in pairs(rec_unit:groups()) do
             dumpstring = dumpstring .. groupID .. ","
         end
+        dumpstring = dumpstring .. "\n\t\t\t"
     end
     dumpstring = string.sub(dumpstring, 1, dumpstring:len() - 1) .. "Restriction Table:\n\t\t"
     for unitID, restricted in pairs(rec_char._restrictedUnits) do
@@ -925,6 +932,48 @@ end
 ------ENFORCEMENT------
 -----------------------
 
+--v function(self: RECRUITER_MANAGER, unitID: string, unitCard: CA_UIC, rec_char: RECRUITER_CHARACTER)
+function recruiter_manager.enforce_caps_on_unit_uic(self, unitID, unitCard, rec_char)
+    local rec_unit = self:get_unit(unitID, rec_char)
+    local is_restricted = rec_char:is_unit_restricted(rec_unit)
+    self:log("Enforcing restrictions for Unit["..unitID.."] Restriction["..tostring(is_restricted).."] Character["..tostring(self._UICurrentCharacter).."] on player UI!")
+    --if the unit is restricted, then
+
+    if is_restricted and not unitCard:GetTooltipText():find("col:red") then
+        self:log("Locking Unit ["..unitID.."]")
+        unitCard:SetInteractive(false)
+        local lockedOverlay = find_uicomponent(unitCard, "disabled_script");
+        if not not lockedOverlay then
+            lockedOverlay:SetVisible(true)
+            lockedOverlay:SetImagePath("ui/custom/recruitment_controls/locked_unit.png")
+            lockedOverlay:SetTooltipText(rec_char:get_unit_lock_string(unitID), true)
+            lockedOverlay:SetCanResizeHeight(true)
+            lockedOverlay:SetCanResizeWidth(true)
+            lockedOverlay:Resize(72, 89)
+            lockedOverlay:SetCanResizeHeight(false)
+            lockedOverlay:SetCanResizeWidth(false)
+        end
+    else
+    --otherwise, set the card clickable
+        self:log("Unlocking! Unit ["..unitID.."]")
+        unitCard:SetInteractive(true)
+        local lockedOverlay = find_uicomponent(unitCard, "disabled_script");
+        if not not lockedOverlay then
+            if rec_unit._UIPip then
+                lockedOverlay:SetVisible(true)
+                lockedOverlay:SetTooltipText(rec_unit._UIText, true)
+                lockedOverlay:SetImagePath(rec_unit._UIPip)
+                lockedOverlay:SetCanResizeHeight(true)
+                lockedOverlay:SetCanResizeWidth(true)
+                lockedOverlay:Resize(30, 30)
+                lockedOverlay:SetCanResizeHeight(false)
+                lockedOverlay:SetCanResizeWidth(false)
+            else
+                lockedOverlay:SetVisible(false)
+            end
+        end
+    end
+end
 
 --applies the restrictions stored in the currently selected rec character to the UI directly.
 --v function(self: RECRUITER_MANAGER, rec_unit: RECRUITER_UNIT)
@@ -944,7 +993,7 @@ function recruiter_manager.enforce_ui_restriction_on_unit(self, rec_unit)
         return
     end
     local unitID = rec_unit._key
-    self:log("Enforcing restrictions for Unit["..unitID.."] Restriction["..tostring(rec_char:is_unit_restricted(unitID)).."] Character["..tostring(self._UICurrentCharacter).."] on player UI!")
+    
     --check if merc is open
     local path_to_mercs = pathset:mercenary_path()
     local mercenaryRecruitmentList = find_uicomponent_from_table(core:get_ui_root(), path_to_mercs);
@@ -957,56 +1006,7 @@ function recruiter_manager.enforce_ui_restriction_on_unit(self, rec_unit)
         local unitCard = find_uicomponent(mercenaryRecruitmentList, unit_component_ID)
         --if we got the unit card, proceed
         if is_uicomponent(unitCard) then
-            --first, check if the unit is supposed to be visible.
-            --[[if rec_char:is_unit_hidden(unitID) then
-                self:log("Setting unit card ["..unit_component_ID.."] hidden")
-                if unitCard:Visible() then
-                    unitCard:SetVisible(false)
-                end
-            --else --otherwise, care about locking it.]]
-                --self:log("Setting unit card ["..unit_component_ID.."] invisible")
-                if not unitCard:Visible() then
-                    unitCard:SetVisible(true)
-                end
-                --if the unit is restricted, then
-                if rec_char:is_unit_restricted(unitID) == true and not unitCard:GetTooltipText():find("col:red") then
-                    self:log("Locking Unit Card ["..unit_component_ID.."]")
-                    unitCard:SetInteractive(false)
-                    -- unitCard:SetVisible(false)
-                    local lockedOverlay = find_uicomponent(unitCard, "disabled_script");
-                    if not not lockedOverlay then
-                        lockedOverlay:SetVisible(true)
-                        lockedOverlay:SetImagePath("ui/custom/recruitment_controls/locked_unit.png")
-                        lockedOverlay:SetTooltipText(rec_char:get_unit_lock_string(unitID), true)
-                        lockedOverlay:SetCanResizeHeight(true)
-                        lockedOverlay:SetCanResizeWidth(true)
-                        lockedOverlay:Resize(72, 89)
-                        lockedOverlay:SetCanResizeHeight(false)
-                        lockedOverlay:SetCanResizeWidth(false)
-                    end
-                    --unitCard:SetVisible(false)
-                else
-                --otherwise, set the card clickable
-                    self:log("Unlocking! Unit Card ["..unit_component_ID.."]")
-                    unitCard:SetInteractive(true)
-                    -- unitCard:SetVisible(true)
-                    local lockedOverlay = find_uicomponent(unitCard, "disabled_script");
-                    if not not lockedOverlay then
-                        if rec_unit._UIPip then
-                            lockedOverlay:SetVisible(true)
-                            lockedOverlay:SetTooltipText(rec_unit._UIText, true)
-                            lockedOverlay:SetImagePath(rec_unit._UIPip)
-                            lockedOverlay:SetCanResizeHeight(true)
-                            lockedOverlay:SetCanResizeWidth(true)
-                            lockedOverlay:Resize(30, 30)
-                            lockedOverlay:SetCanResizeHeight(false)
-                            lockedOverlay:SetCanResizeWidth(false)
-                        else
-                            lockedOverlay:SetVisible(false)
-                        end
-                    end
-                end
-            --end
+            self:enforce_caps_on_unit_uic(unitID, unitCard, rec_char)
         else 
             --do nothing
         end
@@ -1025,55 +1025,7 @@ function recruiter_manager.enforce_ui_restriction_on_unit(self, rec_unit)
             --if we got the unit card, proceed
             if is_uicomponent(unitCard) then
                 --first, check if the unit is supposed to be visible.
-                if rec_char:is_unit_hidden(unitID) then
-                    self:log("Setting unit card ["..unit_component_ID.."] hidden")
-                    if unitCard:Visible() then
-                        unitCard:SetVisible(false)
-                    end
-                else --otherwise, care about locking it.
-                    if not unitCard:Visible() then
-                        self:log("Setting unit card ["..unit_component_ID.."] visible")
-                        unitCard:SetVisible(true)
-                    end
-                    --if the unit is restricted, set the card to be unclickable.
-                    if rec_char:is_unit_restricted(unitID) == true and not unitCard:GetTooltipText():find("col:red") then
-                        self:log("Locking Unit Card ["..unit_component_ID.."]")
-                        unitCard:SetInteractive(false)
-                        -- unitCard:SetVisible(false)
-                        local lockedOverlay = find_uicomponent(unitCard, "disabled_script");
-                        if not not lockedOverlay then
-                            lockedOverlay:SetVisible(true)
-                            lockedOverlay:SetImagePath("ui/custom/recruitment_controls/locked_unit.png")
-                            lockedOverlay:SetTooltipText(rec_char:get_unit_lock_string(unitID), true)
-                            lockedOverlay:SetCanResizeHeight(true)
-                            lockedOverlay:SetCanResizeWidth(true)
-                            lockedOverlay:Resize(72, 89)
-                            lockedOverlay:SetCanResizeHeight(false)
-                            lockedOverlay:SetCanResizeWidth(false)
-                        end
-                        --unitCard:SetVisible(false)
-                    else
-                    --otherwise, set the card clickable
-                        self:log("Unlocking! Unit Card ["..unit_component_ID.."]")
-                        unitCard:SetInteractive(true)
-                        -- unitCard:SetVisible(true)
-                        local lockedOverlay = find_uicomponent(unitCard, "disabled_script");
-                        if not not lockedOverlay then
-                            if rec_unit._UIPip then
-                                lockedOverlay:SetVisible(true)
-                                lockedOverlay:SetTooltipText(rec_unit._UIText, true)
-                                lockedOverlay:SetImagePath(rec_unit._UIPip)
-                                lockedOverlay:SetCanResizeHeight(true)
-                                lockedOverlay:SetCanResizeWidth(true)
-                                lockedOverlay:Resize(30, 30)
-                                lockedOverlay:SetCanResizeHeight(false)
-                                lockedOverlay:SetCanResizeWidth(false)
-                            else
-                                lockedOverlay:SetVisible(false)
-                            end
-                        end
-                    end
-                end
+                self:enforce_caps_on_unit_uic(unitID, unitCard, rec_char)
             else 
                 --do nothing
             end
@@ -1124,6 +1076,36 @@ function recruiter_manager.enforce_unit_and_grouped_units(self, unitID, rec_char
         end
     end
 end
+
+---------------------
+----Unit Upgrades----
+---------------------
+
+--handlers for unit upgrade mechanics added by mods.
+--units trigger UnitDisbanded when destroyed through the UI. 
+--the grant_unit command is wrapped to pick up units added from script.
+--v function(self: RECRUITER_MANAGER, character_cqi: CA_CQI, unitID: string, upgradedUnitID: string) --> boolean
+function recruiter_manager.can_upgrade_unit_to_unit(self, character_cqi, unitID, upgradedUnitID)
+    --self:log("Evaluating whether ["..tostring(character_cqi).."] can upgrade ["..unitID.."] into ["..upgradedUnitID.."]")
+    --the mods which use this function tend to call it... often. Logs are commented out.
+    local exceeds_cap = false --:boolean
+    local rec_char = self:get_character_by_cqi(character_cqi)
+    local rec_unit = self:get_unit(unitID, rec_char)
+    local rec_unit_upgrade = self:get_unit(upgradedUnitID, rec_char)
+    local upgrade_weight = rec_unit_upgrade:weight()
+    for groupID, _ in pairs(rec_unit_upgrade:groups()) do
+        local current_count = rec_char:get_group_counts_on_character(groupID)
+        local limit = rec_char:get_quantity_limit_for_group(groupID)
+        if rec_unit:has_group(groupID) then
+            current_count = current_count - rec_unit:weight()
+        end
+        exceeds_cap = exceeds_cap or ((current_count + upgrade_weight) > limit)
+        --self:log("Upgraded unit has group ["..groupID.."] with weight ["..upgrade_weight.."], count was ["..current_count.."] after removing current unit, limit is ["..limit.."]")
+    end
+    --self:log("Upgrade is valid: "..tostring(not exceeds_cap))
+    return not exceeds_cap
+end
+
 
 
 ----------------------------
@@ -1177,24 +1159,6 @@ end
 ------------------------
 ----UI UNIT PROFILES----
 ------------------------
-
---[[ --TODO this
---sets a UI text for a given unit
---v function(self: RECRUITER_MANAGER, unitID: string, UIText: string)
-function recruiter_manager.set_ui_text_for_unit(self, unitID, UIText)
-    if (not is_string(unitID)) then 
-        self:log("set_ui_text_for_unit called with bad arg #1, unitID must be a string!")
-    elseif (not is_string(UIText)) then
-        self:log("set_ui_text_for_unit called with bad arg #2, UIText must be a string!")
-    end
-    self:get_unit(unitID):set_ui_text_for_unit
-
-
-end--]]
-
-
-
-
 
 --set the UI profile for a unit.
 
@@ -1626,7 +1590,44 @@ if __game_mode == __lib_type_campaign then
         end,
         true
     )
+
+
     
+
+    --v function(cm: CM, char_string: string, unit_key: string) 
+    function new_grant_unit(cm, char_string, unit_key)
+        local ok, err = pcall(function()
+            if not is_string(char_string) then
+                script_error("ERROR: grant_unit_to_character() called but supplied value char_string [" .. tostring(char_string) .. "] is not a string")
+                return 
+            end
+            if not is_string(unit_key) then
+                script_error("ERROR: grant_unit_to_character() called but supplied value unit_key [" .. tostring(unit_key) .. "] is not a string")
+                return 
+            end
+            cm.game_interface:grant_unit_to_character(char_string, unit_key)    
+            if string.find(char_string, "cqi:") then
+                local cqi = tonumber(getnumbersfromtext(char_string)) --# assume cqi: CA_CQI
+                local character = cm:get_character_by_cqi(cqi)
+                if not character:is_null_interface() and character:faction():is_human() then
+                    rm:log("GRANT UNIT COMMAND: ".. char_string.." resolved to cqi "..tostring(cqi))
+                    local rec_char = rm:get_character_by_cqi(cqi)
+                    rec_char:add_unit_to_army(unit_key)
+                else
+                    rm:log("GRANT UNIT COMMAND: ".. char_string.." resolved to cqi "..tostring(cqi)..", but returned a null interface.")
+                end
+            else
+                rm:log("GRANT UNIT COMMAND: No CQI in char_string "..char_string)
+            end
+            return true
+        end)
+        if not ok then
+            rm:log("GRANT UNIT COMMAND FAILED")
+            rm:log("ERR MSG: "..tostring(err))
+        end
+    end
+    
+    cm.grant_unit_to_character = new_grant_unit
     cm:add_first_tick_callback(function()
         
         local groups = {} --:map<string, boolean>

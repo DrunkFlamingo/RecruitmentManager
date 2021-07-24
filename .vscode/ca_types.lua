@@ -118,6 +118,7 @@
 
 -- CAMPAIGN MANAGER
 --# assume CM.get_game_interface: method() --> CA_GAME
+--# assume CM.game_interface: CA_GAME
 --# assume CM.model: method() --> CA_MODEL
 --# assume CM.is_multiplayer: method() --> boolean
 --# assume CM.is_new_game: method() --> boolean
@@ -332,7 +333,7 @@
 
 -- GAME INTERFACE
 --# assume CA_GAME.filesystem_lookup: method(filePath: string, matchRegex:string) --> string
-
+--# assume CA_GAME.grant_unit_to_character: method(lookup: string , unit: string)
 
 -- CHARACTER
 --# assume CA_CHAR.has_trait: method(traitName: string) --> boolean

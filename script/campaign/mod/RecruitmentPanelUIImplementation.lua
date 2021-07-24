@@ -30,7 +30,10 @@ cm:add_first_tick_callback(function()
         true,
         function(context)
             --# assume context: CA_UIContext
-            local unit_component_ID = tostring(UIComponent(context.component):Id())
+            local uic = UIComponent(context.component)
+            local unit_component_ID = tostring(uic:Id())
+            local pin = find_uicomponent(uic, "pin_parent", "button_pin")
+            if pin and string.find(pin:CurrentState(), "hover") then return end
             --is our clicked component a unit?
             if string.find(unit_component_ID, "_recruitable") and UIComponent(context.component):CurrentState() == "active" and (not UIComponent(context.component):GetTooltipText():find("col:red")) then
                 --print_all_uicomponent_children(UIComponent(context.component))
@@ -54,7 +57,10 @@ cm:add_first_tick_callback(function()
         true,
         function(context)
             --# assume context: CA_UIContext
-            local unit_component_ID = tostring(UIComponent(context.component):Id())
+            local uic = UIComponent(context.component)
+            local unit_component_ID = tostring(uic:Id())
+            local pin = find_uicomponent(uic, "pin_parent", "button_pin")
+            if pin and string.find(pin:CurrentState(), "hover") then return end
             --is our clicked component a unit?
             if string.find(unit_component_ID, "_mercenary") and UIComponent(context.component):CurrentState() == "active" and (not UIComponent(context.component):GetTooltipText():find("col:red")) then
                 --its a unit! steal the users input so that they don't click more shit while we calculate.
@@ -222,11 +228,16 @@ cm:add_first_tick_callback(function()
                 if was_created then
                     rm:check_all_units_on_character(current_character)
                     rm:enforce_all_units_on_current_character()
+                elseif current_character:is_queue_stale() or current_character:is_army_stale() then
+                    rm:check_all_units_on_character(current_character)
+                    rm:enforce_all_units_on_current_character()
                 end
                 core:trigger_event("RecruiterManagerGroupCountUpdated", cm:get_character_by_cqi(rm:current_character():command_queue_index()))
             end, 0.1)
         end,
         true)
+    
+
     --add recruit panel open listener
     core:add_listener(
         "RecruiterManagerOnRecruitPanelOpened",
@@ -341,9 +352,12 @@ cm:add_first_tick_callback(function()
             --remove the unit from the army
             rm:get_character_by_cqi(unit:force_commander():command_queue_index()):remove_unit_from_army(unit:unit_key())
             --check the unit (+groups) again.
-            rm:check_individual_unit_on_character(unit:unit_key(), rm:current_character())
-            rm:enforce_all_units_on_current_character()
-            rm:output_state(rm:current_character())
+            cm:callback(function()
+                rm:check_all_units_on_character(rm:current_character())
+                rm:enforce_all_units_on_current_character()
+                rm:output_state(rm:current_character())
+                core:trigger_event("RecruiterManagerGroupCountUpdated", cm:get_character_by_cqi(rm:current_character():command_queue_index()))
+            end, 0.1)
         end,
         true);
     --add merged listener
@@ -354,15 +368,16 @@ cm:add_first_tick_callback(function()
             return context:new_unit():faction():is_human() and rm:has_character(context:new_unit():force_commander():command_queue_index())
         end,
         function(context)
+            rm:log("PATH START Human character merged a unit")
             local unit = context:new_unit():unit_key() --:string
             local cqi = context:new_unit():force_commander():command_queue_index() --:CA_CQI
-            --there is a lot of possibilies when a merge has happened
-            --to be safe, we just set the army stale. 
-            rm:get_character_by_cqi(cqi):set_army_stale()
+            rm:get_character_by_cqi(cqi):remove_unit_from_army(unit)
             cm:remove_callback("RMMergeDestroy")
             cm:callback(function()
                 rm:check_all_units_on_character(rm:get_character_by_cqi(cqi))
+                rm:enforce_all_units_on_current_character()
                 rm:output_state(rm:current_character())
+                core:trigger_event("RecruiterManagerGroupCountUpdated", cm:get_character_by_cqi(rm:current_character():command_queue_index()))
             end, 0.2, "RMMergeDestroy")
         end,
         true)
