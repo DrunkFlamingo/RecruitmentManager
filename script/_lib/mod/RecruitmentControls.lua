@@ -189,9 +189,7 @@ function error_check()
     end
     core.add_listener = myAddListener;
 end
-if __write_output_to_logfile then
-    error_check()
-end
+
 
 --v function(loc: string, ...: string) --> string
 local function fill_loc(loc, ...)
@@ -1232,6 +1230,9 @@ end
 
 --institation 
 if __game_mode == __lib_type_campaign then
+    if __write_output_to_logfile then
+        error_check()
+    end
     local rm = recruiter_manager.init()
     _G.rm = rm
     core:add_static_object("recruitment_manager", rm)

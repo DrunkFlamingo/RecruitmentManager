@@ -3,23 +3,10 @@ local rm = core:get_static_object("recruitment_manager")
 local ast_line = "**********************************************************************\n"
 
 
---v [NO_CHECK] function() --> boolean
-function check_mct()
-    local mct = core:get_static_object("mod_configuration_tool")
-    if mct then
-        local ttc_mod = mct:get_mod_by_key("ttc")
-        local enable_rm = ttc_mod:get_option_by_key("a_enable")
-        return enable_rm:get_finalized_setting() 
-    end
-    return true
-end
 
 
 cm:add_first_tick_callback(function()
 
-    if not check_mct() then
-        --return
-    end
     --localisations
     local loc_points = effect.get_localised_string("ttc_measurement_name")
     local loc_restriction = effect.get_localised_string("ttc_restriction_tooltip")
