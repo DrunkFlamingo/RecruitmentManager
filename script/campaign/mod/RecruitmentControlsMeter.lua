@@ -74,7 +74,7 @@ local function update_display(uic, rec_char, groupID)
             end
         end
         for unit_key, num_units in pairs(rec_char._queueCounts) do
-            if rec_char._armyCounts[unit_key] == 0 and num_units > 0 then
+            if (not rec_char._armyCounts[unit_key]) and num_units > 0 then
                 local rec_unit = rec_char:get_unit(unit_key)
                 if rec_unit:has_group(groupID) then
                     local num_points = num_units * rec_unit:weight()
