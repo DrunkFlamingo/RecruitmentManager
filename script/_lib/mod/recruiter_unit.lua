@@ -26,6 +26,8 @@ function recruiter_unit.create_record(manager, main_unit_key, base_unit)
    --Override entries hold their own profiles so no profile overrides are needed at the character level.
    self._UIPip = nil --:string
    self._UIText = nil  --:string
+   -- unit localisation is based on the land unit key, but the script can only work with main unit keys.
+   -- this lets us manually set a land unit for where the key isn't identical to main unit.
    self._landUnit = nil --:string
    return self
 end

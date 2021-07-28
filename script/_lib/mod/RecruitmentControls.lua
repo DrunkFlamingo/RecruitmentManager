@@ -1,20 +1,39 @@
 --[[
-New System Outline
-Evaluation:
---characters store what units are locked for them.
---Characters also store information about their armies, queues.
---On evaluation triggers, grabs lists of units from armies, then
-    --finds a record for the cost and category of the unit
-        --if the record is generic, stored in the model
-        --specific records for special rules can be stored on characters.       
-    --Sums all group totals
-    --applies restrictions for groups exceeding the total
-Enforcement
---When enforcement is called, checks the character for a pathset
-    --pathsets are applied to characters on creation, specify which recruitment UI the fation uses.
---Enforcement uses pathset to access listview objects for recruitment panels, 
---loops through the listview
---checks the unit keys 
+If you're trying to understand the mod, start here.
+
+Subobjects:
+    RECRUITER_CHARACTERs: hold info about what units a force has in army and queue and logic for determining whether a recruitment option should be allowed.
+    RECRUITER_UNITs: hold info about the groups and weight of a unit.
+    RECRUITER_PATHSETs: hold info about the UI paths to take when searching for UI components to apply restrictions to. 
+
+    When a unit key is added to the caps system, a RECRUITER_UNIT: rec_unit is created to represent them.
+        This unit is stored in the RM object.
+        Units are added from a seperate implementation file.
+
+    When a CA_CHAR is selected in game, a RECRUITER_CHARACTER: rec_char is created to represent them.
+        This rec_char is assigned a RECRUITER_PATHSET: rec_path based on their agent subtype or faction subculture.
+            Pathsets are defined and filtered to subcultures and subtypes in a seperate implementation file.
+        This rec_char may be assigned a RECRUITER_UNIT: owned_unit. An owned_unit can assigned based on the subtype, subculture, skills or traits of a character.
+            If an owned_unit exists for a unit key, this character will use the information of owned_unit.
+            Effectively, this causes rec_char to treat a unit differently from other RECRUITER_CHARACTERs who do not have owned_unit, and is used to create special rules.
+            Otherwise, the character will use the information from the rec_unit stored in the RM object for that unit key.
+        This rec_char counts the number of points spent by the character on the units in their queue and army.
+            These counts are updated whenever a unit is removed or added from the army or the queue.
+        rec_char may be queried to determine whether a unit should be locked.
+
+    On event:
+        Remove or add units, or refresh queues and armies, to make sure that rec_char has an accurate picture of the army.
+        Use the path_set attached to the rec_char to find the UI unit cards of the available recruitment options for that unit.
+        Ask rec_char whether each unit is available.
+        Construct a helpful explaination string and enforce the restrictions to the UI. 
+    Which units get enforced after an event depends on the event:
+        For events like opening the recruitment panel, all units get enforced.
+        For events which change the status of a single unit, such as adding or removing from queue, all the units which share a group with the unit being changed are enforced. 
+
+    AI enforcement is implemented seperately using grant and remove unit commands to adjust AI armies.
+    A "Meter" summarizes cap information for the player and is updated by an event which we trigger after cap enforcement.
+    
+
 --]]
 --# assume debug.getinfo: function(WHATEVER) --> map<string, string>
 
@@ -54,7 +73,7 @@ end
 RCSESSIONLOG()
 
 
-
+--this wraps core:add_listener and several other functions in error printing code.
 --v [NO_CHECK] function()
 function error_check()
     --Vanish's PCaller
@@ -190,7 +209,7 @@ function error_check()
     core.add_listener = myAddListener;
 end
 
-
+--this fills in template the localisation strings with information from the script.
 --v function(loc: string, ...: string) --> string
 local function fill_loc(loc, ...)
     local output = loc
@@ -202,6 +221,7 @@ local function fill_loc(loc, ...)
     return output
 end
 
+--used to get the CQI out of a char_string
 --v [NO_CHECK] function(txt: string) --> string
 local function getnumbersfromtext(txt)
     local str = "" --:string
@@ -254,26 +274,17 @@ function recruiter_manager.init(supress_log)
     --stores the current player character. 
     self._UICurrentCharacter = nil --:CA_CQI
 
-    --stores faction wide restrictions, which prevent recruitment for a whole faction.
-    self._factionWideRestrictions = {} --:map<string, map<string, boolean>>
-    --stores the acompanying lock texts by faction for units
-    self._UIFactionWideLockTexts = {} --:map<string, map<string, string>>
-
-    --individual unit quantity limits
-    self._characterUnitLimits = {} --:map<string, number>
-
     --Group UI names
     self._UIGroupNames = {} --:map<string, string>
     --unit group quantity limits
     self._groupUnitLimits = {} --:map<string, number>
     --grouped units
     self._groupToUnits = {} --:map<string, vector<string>>
-
     --stores default acceptible units for the AI to use
     self._AIDefaultUnits = {} --:map<string, vector<string>>
 
 
-    --sets whether the mod is on or not
+    --sets whether the mod is on or not - effectively toggles the mod being active.
     self._isEnforcementEnabled = true
     --flags whether to enforce AI functionality
     self._AIEnforce = true --:boolean
@@ -281,15 +292,17 @@ function recruiter_manager.init(supress_log)
     self._specialPointLimit = 10 --:int
     self._rarePointLimit = 5 --:int
 
-    --this is used to find which groups we should be displaying on the meter UI.
+    --this is used to find which groups we should be displaying on the meter UI, and as a helper when adding loaned units.
     self._subculturePrefixes = {} --:map<string, string>
 
-    --units are appended into these lists then added at the end.
+    --these tables temporarily store information about units to add into the system.
+    --This is done to provide some checking for redundant unit entries.
     self._normalUnitsToAdd = {} --:vector<{string, string, number?}>
     self._overriddenUnitSettings = {} --:map<string, {string, string, number?}>
     self._loanedUnitsToAdd = {} --:vector<{string, string|vector<string>, string, number?}>
     self._unitTextOverrides = {} --:map<string, RM_UIPROFILE>
     self._postSetupCallbacks = {} --:vector<function()>
+    self._preSetupCallbacks = {} --:vector<function()>
 
 
     return self
@@ -325,38 +338,6 @@ function recruiter_manager.GetQueuedUnit(self, index, prefix)
     end
 end
 
----------------------------------
-----FACTION WIDE RESTRICTIONS----
----------------------------------
-
---v function(self: RECRUITER_MANAGER, unitID: string, faction_name: string) --> boolean
-function recruiter_manager.is_unit_faction_restricted(self, unitID, faction_name)
-    if self._factionWideRestrictions[unitID] == nil then
-        return false
-    end
-    return not not self._factionWideRestrictions[unitID][faction_name]
-end
-
---v function(self: RECRUITER_MANAGER, unitID: string, faction_name: string, restrict: boolean)
-function recruiter_manager.set_unit_restriction_for_faction(self, unitID, faction_name, restrict)
-    self._factionWideRestrictions[unitID] = self._factionWideRestrictions[unitID] or {}
-    self._factionWideRestrictions[unitID][faction_name] = restrict
-    if not restrict then
-        if self._UIFactionWideLockTexts[unitID] then
-            self._UIFactionWideLockTexts[unitID][faction_name] = nil
-        end
-    end
-end
-
---v function(self: RECRUITER_MANAGER, unitID: string, faction_name: string, lock_reason: string) 
-function recruiter_manager.add_factionwide_lock_text(self, unitID, faction_name, lock_reason)
-    self._UIFactionWideLockTexts[unitID] = self._UIFactionWideLockTexts[unitID] or {}
-    if self._UIFactionWideLockTexts[unitID][faction_name] then
-        self._UIFactionWideLockTexts[unitID][faction_name] = self._UIFactionWideLockTexts[unitID][faction_name] .. "\n" .. lock_reason
-    else
-        self._UIFactionWideLockTexts[unitID][faction_name] = lock_reason
-    end
-end
 
 
 --group ui names--
@@ -882,24 +863,6 @@ end
 ----QUANTITY LIMITS API-----
 ----------------------------
 
---get the limit of a specific unit
---v function(self: RECRUITER_MANAGER, unitID: string) --> number
-function recruiter_manager.get_quantity_limit_for_unit(self, unitID)
-    if self._characterUnitLimits[unitID] == nil then
-        return 999 --avoid clogging memoryu
-    end
-    return self._characterUnitLimits[unitID]
-end
-
-
-
---adds a quantity check function to the stack of a single unit.
---v function(self: RECRUITER_MANAGER, unitID: string, quantity_limit: number)
-function recruiter_manager.add_single_unit_quantity_limit(self, unitID, quantity_limit)
-    --TODO implement single unit quantity restrictions if needed.
-end
-
-
 --get the quantity limit of a specific group
 --v function(self: RECRUITER_MANAGER, groupID: string) -->number
 function recruiter_manager.get_base_quantity_limit_for_group(self,groupID)
@@ -1149,6 +1112,11 @@ function recruiter_manager.add_post_setup_callback(self, callback)
     table.insert(self._postSetupCallbacks, callback)
 end
 
+--v function(self: RECRUITER_MANAGER, callback: function())
+function recruiter_manager.add_pre_setup_callback(self, callback)
+    table.insert(self._preSetupCallbacks, callback)
+end
+
 
 ---DEPRECATED API-----
 ----------------------
@@ -1206,42 +1174,23 @@ local function init_mct(rm)
     end
 end
 
---v [NO_CHECK] function(wrapper: WHATEVER, rm_instance: RECRUITER_MANAGER)
-local function wrap_to_ignore_eh_files(wrapper, rm_instance)
-    setmetatable(wrapper, {
-        __index = function(t, k)
-            if type(rm_instance[k]) == "function" then
-                local source = debug.getinfo(2).source
-                if string.find(debug.getinfo(2).source, "export_helper") then
-                    rm_instance:log("Rejected a call from "..source)
-                    rm_instance:log("Export helpers are not supported!")
-                    local dummy_rm_copy = recruiter_manager.init(true)
-                    return dummy_rm_copy[k]
-                else
-                    return rm_instance[k]
-                end
-            else
-                return rm_instance[k]
-            end
-        end
-    })
-    _G.rm = wrapper
-end
 
 --institation 
+--this file loads in front end and battle but we only want things to happen in campaign.
 if __game_mode == __lib_type_campaign then
+    --if we are logging, turn on error checking
     if __write_output_to_logfile then
         error_check()
     end
+    --start RM
     local rm = recruiter_manager.init()
     _G.rm = rm
     core:add_static_object("recruitment_manager", rm)
-    local wrapper = {}
-    --wrap_to_ignore_eh_files(wrapper, rm)
+    --apply MCT settings to RM
     init_mct(rm)
 
     rm:log("Adding Listeners and First Tick Callbacks", true)
-    --implement the UIPathAssignment
+    --implement the UIPathAssignment - this gives characters their recruitment path.
     core:add_listener(
         "UIRecruiterCharacterCreatedUIPathAssignment",
         "UIRecruiterCharacterCreated",
@@ -1261,7 +1210,7 @@ if __game_mode == __lib_type_campaign then
         true
     )
 
-    --implementation for subtype and subculture filters on creation
+    --implementation for adding override units by subtype and subculture filters on creation
     core:add_listener(
         "UIRecruiterCharacterCreatedUIPathAssignment",
         "UIRecruiterCharacterCreated",
@@ -1301,6 +1250,7 @@ if __game_mode == __lib_type_campaign then
         end,
         true)
 
+    --these functions handle and save any skills which are relevant to override units. 
     local RECIEVED_SKILLS = {} --:map<string, vector<string>>
 
     --v function(cqi: CA_CQI, skill: string)
@@ -1363,10 +1313,9 @@ if __game_mode == __lib_type_campaign then
         end,
         true
     )
-
-
     
-
+    --this is a wrapper for game_interface:grant_unit_to_character that adds the unit to the rec_character's army when it is called.
+    --helps make the mod compatible with mods which are using this command - ex unit upgrades
     --v function(cm: CM, char_string: string, unit_key: string) 
     function new_grant_unit(cm, char_string, unit_key)
         local ok, err = pcall(function()
@@ -1399,10 +1348,22 @@ if __game_mode == __lib_type_campaign then
             rm:log("ERR MSG: "..tostring(err))
         end
     end
-    
     cm.grant_unit_to_character = new_grant_unit
+
+    --this is where we start processing the units which are added to the system.
     cm:add_first_tick_callback(function()
-        
+        rm:log("Running pre setup callbacks")
+        --this provides a place for people to add callbacks which should always go before the system starts running.
+        for i = 1, #rm._preSetupCallbacks do
+            local ok, err = pcall(rm._preSetupCallbacks[i])
+            if not ok then
+                rm:log("Errror in pre setup callbacks:", true)
+                rm:log(err, true)
+            end
+        end
+        rm._preSetupCallbacks = {}
+
+
         local groups = {} --:map<string, boolean>
         local units_already_added = {} --:map<string, boolean>
         --localisations
@@ -1500,12 +1461,13 @@ if __game_mode == __lib_type_campaign then
             end
             rm:log("Finished adding units", true)
             rm._normalUnitsToAdd = {}
-
+            rm:log("Adding Loaned Units", true)
             --this loop adds all loaned units to the game.
             for i = 1, #loaned_units_table do
                 local current_entry = loaned_units_table[i]
                 local subcultures = current_entry[2]--:any
                 local sc_was_table = false--:boolean
+                --this table supports either a string or a list being passed here, so we convert any strings to a one item list.
                 if type(current_entry[2]) == "string" then
                     subcultures = {current_entry[2]}
                     sc_was_table = true
@@ -1552,6 +1514,8 @@ if __game_mode == __lib_type_campaign then
                     rm:log(subculture.." loaned unit "..current_entry[1].." into group with prefix "..prefix)
                 end
             end
+            rm._loanedUnitsToAdd = {}
+            rm:log("Added loaned units", true)
             --this loop sets up the groups and their limits.
             for name, _ in pairs(groups) do
                 if string.find(name, "core") then
@@ -1568,19 +1532,25 @@ if __game_mode == __lib_type_campaign then
                 end
                 rm:log("Set name and quantity limit for group: "..name)
             end
-            rm._loanedUnitsToAdd = {}
+            rm:log("Set group locs and limits", true)
         end)
         if not ok then
+            rm:log("Error in processing units and groups:", true)
             rm:log(err, true)
         end
+        rm:log("Running post setup callbacks", true)
+        --this provides a place for people to add callbacks which depend upon units already being present in the system, such as to set up special rules.
         for i = 1, #rm._postSetupCallbacks do
             local ok, err = pcall(rm._postSetupCallbacks[i])
             if not ok then
+                rm:log("Error in post setup callbacks:", true)
                 rm:log(err, true)
             end
         end
         rm._postSetupCallbacks = {}
+        rm:log("First Tick Callback Finished", true)
     end)
+    rm:log("Finished", true)
 else
     RCLOG("Recruiter Manager did not load: gametype is not __lib_type_campaign")
 end

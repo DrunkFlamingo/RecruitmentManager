@@ -98,18 +98,7 @@ local function rm_ai_evaluation(faction)
         local character = character_list:item_at(i)
         rm_ai_character(character)
     end
-    --[[ TODO Unit Pools
-    if not rm._unitPoolQuantities[faction:name()] == nil then
-        for unit, quantity in pairs(rm._unitPoolQuantities[faction:name()]) do
-            if quantity <= 0 then
-                rm:log("AI Faction ["..faction:name().."] is out of unit "..unit.." ")
-                cm:add_event_restricted_unit_record_for_faction(unit, faction:name())
-            else
-                cm:remove_event_restricted_unit_record_for_faction(unit, faction:name())
-            end
-        end
-    end--]]
-    --TODO clone colonel fix
+
     cm:callback(function()
     for i = 0, character_list:num_items() - 1 do
         local character = character_list:item_at(i)

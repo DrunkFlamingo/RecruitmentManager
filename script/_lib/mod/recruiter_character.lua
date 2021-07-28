@@ -30,6 +30,8 @@ function recruiter_character.new(manager, cqi)
     --stores how much of each category is possessed.
     self._groupCounts = {} --:map<string, number>
 
+    --this cache's the last response of this rec_char to whether a unit is restricted. 
+    --it is used for logging.
     self._restrictedUnits = {} --:map<string, boolean>
 
     --new 10/15/19
@@ -99,6 +101,7 @@ function recruiter_character.add_overriden_unit_entry(self, unitID, rec_unit)
     self._ownedUnits[unitID] = rec_unit
 end
 
+--if we have our own version of the unit, provide it. Otherwise, provide the global one from our rec_manager.
 --v function(self: RECRUITER_CHARACTER, unitID: string) --> RECRUITER_UNIT
 function recruiter_character.get_unit(self, unitID)
     if self:has_own_unit(unitID) then
@@ -382,6 +385,7 @@ end
 -------TEMP MERCENARY QUEUE TRACKING-------
 -------------------------------------------
 
+--add a mercenary to the queue.
 --v function(self: RECRUITER_CHARACTER, rec_unit: RECRUITER_UNIT)
 function recruiter_character.queue_mercenary(self, rec_unit)
     self:log("Added ["..rec_unit:key().."] to the MercQueue of ["..self:cqi_as_str().."] at ["..tostring(#self._mercenaryQueue).."] ")
@@ -392,6 +396,7 @@ function recruiter_character.queue_mercenary(self, rec_unit)
     end
 end
 
+--remove the mercenary from the queue and let the script know what it was.
 --v function(self: RECRUITER_CHARACTER, Position: int) --> string
 function recruiter_character.remove_merc_at_position_returning_key(self, Position)
     if not self._mercenaryQueue[Position] then
@@ -408,6 +413,7 @@ function recruiter_character.remove_merc_at_position_returning_key(self, Positio
     return unitID
 end
 
+--clear the mercenary queue.
 --v function(self: RECRUITER_CHARACTER, did_recruit: boolean)
 function recruiter_character.clear_mercenary_queue(self, did_recruit)
     for i = 1, #self._mercenaryQueue do
@@ -422,6 +428,7 @@ function recruiter_character.clear_mercenary_queue(self, did_recruit)
     end
 end
 
+--count a unit in the merc queue
 --v function(self: RECRUITER_CHARACTER, unitID: string) --> number
 function recruiter_character.get_mercenary_count(self, unitID)
     if #self._mercenaryQueue == 0 then

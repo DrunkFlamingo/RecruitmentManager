@@ -446,7 +446,6 @@ local function check_individual_army_validity(army_count, rec_char)
        for groupID, _ in pairs(rec_unit:groups()) do
             groups[groupID] = (groups[groupID] or 0) + (rec_unit:weight() * count)
        end
-       --TODO implement individual unit caps.
     end
     for groupID, count in pairs(groups) do
         local limit = rec_char:get_quantity_limit_for_group(groupID)
