@@ -76,7 +76,6 @@ for i = 1, #ship_subtypes do
 end
 
 local default_cultures = {
-    "wh_dlc03_sc_bst_beastmen",
     "wh_dlc05_sc_wef_wood_elves",
     "wh_main_sc_brt_bretonnia",
     "wh_main_sc_chs_chaos",
@@ -114,7 +113,8 @@ for i = 1, #black_ark_cultures do
 end
 
 local pseudohorde_enabled_cultures = {
-    "wh2_main_sc_lzd_lizardmen"
+    "wh2_main_sc_lzd_lizardmen",
+    "wh_dlc03_sc_bst_beastmen"
 }--:vector<string>
 
 for i = 1, #pseudohorde_enabled_cultures do
