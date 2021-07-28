@@ -13,10 +13,9 @@ local ship_subtypes = {
 
 
 if not not rm then
+  rm:set_group_prefix_for_subculture("hobo_kemmy", "vmp")
   rm:add_post_setup_callback(function()
-
     rm:add_subculture_path_filter("hobo_kemmy", "NormalFaction")
-    rm:set_group_prefix_for_subculture("hobo_kemmy", "vmp")
     for i = 1, #ship_subtypes do
       rm:add_subtype_path_filter(ship_subtypes[i], "CharBoundHordeWithGlobal")
     end
